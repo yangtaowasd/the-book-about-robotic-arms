@@ -1,0 +1,272 @@
+\chapter{从关节角到末端位姿 再求逆运动学}\label{ch:kinematics}
+\section{几何模型回答能到哪里}
+运动学（kinematics）研究位置、速度、加速度之间的关系，不直接讨论产生运动所需的力。正运动学（forward kinematics，FK）从关节量求末端位姿；逆运动学（inverse kinematics，IK）反过来求关节量。动力学（dynamics）随后再回答需要多少力矩。一个位置在几何上可达，并不意味着可以以任意速度到达，更不意味着驱动器能承担所需负载。
+
+旋转关节用 R 表示，关节量是角度；移动关节用 P 表示，关节量是距离。自由度（degree of freedom，DoF）是局部独立运动变量的个数。空间刚体最多需要三个平移量和三个旋转量；要在某个姿态附近任意改变六维末端位姿，任务雅可比至少要有六个独立行方向。拥有六个关节只是必要的维数条件之一，不保证所有位姿可达。
+
+本章使用两连杆平面机械臂，参数固定为
+\begin{equation}
+ l_1=l_2=0.5\,\mathrm m,
+ \quad q_1\text{ 从基座 }+x\text{ 轴逆时针量起},
+ \quad q_2\text{ 相对第一杆方向量起}.
+\end{equation}
+第二杆相对基座的绝对方向为 $q_1+q_2$。这里两个关节足以控制平面末端的二维位置，但一般不能独立再指定末端朝向。
+
+\section{两连杆正运动学从投影逐项写出}
+第一杆端点为
+\begin{equation}
+ p_1=\begin{bmatrix}l_1\cos q_1\\l_1\sin q_1\end{bmatrix}.
+\end{equation}
+第二杆相对第一个关节点的位移为
+\begin{equation}
+ p_2-p_1=\begin{bmatrix}l_2\cos(q_1+q_2)\\l_2\sin(q_1+q_2)\end{bmatrix}.
+\end{equation}
+两段位移都已在基座表达，因此可以直接相加：
+\begin{equation}\label{eq:two_r_fk}
+ p(q)=\begin{bmatrix}x\\y\end{bmatrix}
+ =\begin{bmatrix}
+ l_1\cos q_1+l_2\cos(q_1+q_2)\\
+ l_1\sin q_1+l_2\sin(q_1+q_2)
+ \end{bmatrix},\qquad\theta_e=q_1+q_2.
+\end{equation}
+\begin{examplebox}[算例 完整算一次关节角到末端]
+在 $q_1=0$、$q_2=\pi/2$ 时，第一杆端点为 $(0.5,0)$，第二杆增量为 $(0,0.5)$，故末端为 $(0.5,0.5)\,\mathrm m$，朝向为 $90^\circ$。
+若 $q_1=30^\circ$、$q_2=60^\circ$，第二杆绝对朝向仍为 $90^\circ$，于是
+\[
+ x=0.5\frac{\sqrt3}{2}+0=0.433013\,\mathrm m,
+ \qquad y=0.5\frac12+0.5=0.75\,\mathrm m.
+\]
+两组关节角可给出相同末端朝向，却有不同末端位置。只看末端朝向不能判断机械臂是否回到原处。
+\end{examplebox}
+
+\subsection{工作空间是关节允许范围映射出的集合}
+当两个关节都可自由转动、没有障碍和限位时，末端到基座距离 $r$ 满足
+\begin{equation}
+ |l_1-l_2|\le r\le l_1+l_2.
+\end{equation}
+外边界是完全伸直，内边界是完全折叠。相等长度 $0.5\,\mathrm m$ 时，位置工作空间是半径 1 m 的闭圆盘；若长度为 $0.6$ 与 $0.4\,\mathrm m$，则是内半径 0.2 m、外半径 1 m 的圆环。加入关节限位、自碰撞、底座和工具体积后，可用工作空间会缩小，而且可能不再是简单圆环。
+
+\begin{figure}[htbp]
+\centering\includegraphics[width=0.9\linewidth]{figures/mk_workspace.pdf}
+\caption{左图是两连杆的角度定义；右图中外圆是两种长度的共同外界，虚线只是不等长连杆的内界；等长连杆仍能到达虚线内的区域。图中尚未加入限位和碰撞，因此不能直接当作真机可用工作区。}
+\end{figure}
+
+\section{标准 DH 只是整理变换的一种约定}
+Denavit--Hartenberg 参数简称 DH 参数，用四个数描述按规则建立的相邻坐标系。标准 DH 本书采用
+\begin{equation}
+ T_{i-1,i}=R_z(\theta_i)\,T_z(d_i)\,T_x(a_i)\,R_x(\alpha_i).
+\end{equation}
+$\theta_i$ 是绕前一坐标系 $z$ 轴的角度，$d_i$ 是沿该轴的偏移，$a_i$ 是沿连杆公垂线的长度，$\alpha_i$ 是两关节轴间的扭角。旋转关节通常以 $\theta_i=q_i+\theta_{i,0}$ 为变量，移动关节通常以 $d_i$ 为变量。按四个基本变换相乘：
+\begin{equation}
+ T_{i-1,i}=\begin{bmatrix}
+ c_\theta&-s_\theta c_\alpha&s_\theta s_\alpha&a_ic_\theta\\
+ s_\theta&c_\theta c_\alpha&-c_\theta s_\alpha&a_is_\theta\\
+ 0&s_\alpha&c_\alpha&d_i\\
+ 0&0&0&1
+ \end{bmatrix},
+\end{equation}
+其中 $c_\theta=\cos\theta_i$、$s_\theta=\sin\theta_i$，其余同理。这些缩写只为让矩阵排版清楚，不是新增变量。
+
+两连杆采用 $d_i=0$、$\alpha_i=0$、$a_i=l_i$、$\theta_i=q_i$，于是
+\begin{equation}
+ T_{01}=\begin{bmatrix}R_z(q_1)&(l_1\cos q_1,l_1\sin q_1,0)^\mathsf T\\0&1\end{bmatrix},
+\end{equation}
+第二段形式相同，连乘后的旋转为 $R_z(q_1+q_2)$，平移恰好为式~\eqref{eq:two_r_fk}。由此可以检验 DH 表是否与几何直觉一致。
+
+改进 DH（modified DH，MDH）采用不同的坐标放置和变换顺序，同一机械臂的数字不能直接塞进标准 DH 的矩阵。URDF 则通常直接给出关节固定原点变换和轴方向；它不要求用 DH 参数表达。通用链条可以写为
+\begin{equation}
+ T_{\rm base,tool}(q)=T_{\rm base,0}
+ \prod_{i=1}^n T_{i-1,i}(q_i)\,T_{n,\rm tool}.
+\end{equation}
+固定基座安装与固定工具安装都是链条的一部分。末端误差也可能来自这两处，而不一定是关节控制误差。
+
+\section{指数积公式用零位关节轴描述整条链}
+对一个旋转轴，设单位方向为 $\omega_i$，轴上任一点为 $r_i$，则沿本书线速度在前的约定，零位螺旋轴为
+\begin{equation}
+ S_i=\begin{bmatrix}-\omega_i\times r_i\\\omega_i\end{bmatrix}.
+\end{equation}
+因为绕固定轴转动时，空间点 $p$ 的速度是 $\omega_i\times(p-r_i)=(-\omega_i\times r_i)+\omega_i\times p$。对移动关节，取 $S_i=(v_i,0)$，其中 $v_i$ 为单位移动方向。若所有轴均在零位参考系描述，末端零位位姿为 $T_0$，正运动学为
+\begin{equation}
+ T(q)=e^{\widehat S_1q_1}e^{\widehat S_2q_2}\cdots e^{\widehat S_nq_n}T_0.
+\end{equation}
+称为指数积（product of exponentials，PoE）公式。这里使用 $T_0$ 表示零位位姿，以免与后续惯量矩阵 $M$ 混淆。
+
+\begin{examplebox}[算例 两连杆不用 DH 也算到同一个点]
+两轴都沿 $+z$。第一轴经过原点，第二轴零位经过 $(0.5,0,0)$，所以
+\[
+ S_1=(0,0,0,0,0,1)^\mathsf T,
+ \quad S_2=(0,-0.5,0,0,0,1)^\mathsf T,
+ \quad T_0=\begin{bmatrix}I&(1,0,0)^\mathsf T\\0&1\end{bmatrix}.
+\]
+当 $q_1=0,q_2=\pi/2$ 时，第二轴的变换绕点 $r=(0.5,0,0)$ 旋转。其旋转为 $R_z(90^\circ)$，平移为 $(I-R)r=(0.5,-0.5,0)^\mathsf T$。乘零位末端位置得到
+\[
+ p=R(1,0,0)^\mathsf T+(0.5,-0.5,0)^\mathsf T=(0.5,0.5,0)^\mathsf T.
+\]
+与几何法和 DH 法完全一致。不同方法只是模型表达不同，不应产生不同的物理末端位置。
+\end{examplebox}
+
+\section{解析逆运动学从余弦定理推起}
+\subsection{先求肘关节 再求肩关节}
+对式~\eqref{eq:two_r_fk} 平方相加，用 $\cos(a-b)=\cos a\cos b+\sin a\sin b$，可得
+\begin{align}
+ x^2+y^2
+ &=l_1^2+l_2^2
+   +2l_1l_2[\cos q_1\cos(q_1+q_2)+\sin q_1\sin(q_1+q_2)]\\
+ &=l_1^2+l_2^2+2l_1l_2\cos q_2.
+\end{align}
+因此
+\begin{equation}
+ c_2=\cos q_2=\frac{x^2+y^2-l_1^2-l_2^2}{2l_1l_2},
+ \qquad
+ q_2=\operatorname{atan2}\left(\pm\sqrt{1-c_2^2},c_2\right).
+\end{equation}
+若 $|c_2|>1$ 且超过数值容差，就没有实数关节解。$\pm$ 给出两个肘部构型分支。
+
+将末端向量分解成
+\begin{equation}
+ \begin{bmatrix}x\\y\end{bmatrix}
+ =R_z^{(2)}(q_1)
+ \begin{bmatrix}l_1+l_2\cos q_2\\l_2\sin q_2\end{bmatrix},
+\end{equation}
+其中 $R_z^{(2)}$ 是二维旋转矩阵。末端方向角记为 $\gamma$，括号向量相对第一杆的方向角记为 $\beta$，分别为
+\[
+ \gamma=\operatorname{atan2}(y,x),\qquad
+ \beta=\operatorname{atan2}(l_2\sin q_2,l_1+l_2\cos q_2).
+\]
+相减 $q_1=\gamma-\beta$，便得
+\begin{equation}
+ q_1=\operatorname{atan2}(y,x)
+ -\operatorname{atan2}(l_2\sin q_2,l_1+l_2\cos q_2).
+\end{equation}
+这个推导解释每一个反三角项对应哪一个几何角，不必死记符号。
+
+\begin{examplebox}[算例 目标位置有两组关节解]
+目标 $p_d=(0.5,0.5)^\mathsf T\,\mathrm m$，有 $x^2+y^2=0.5$，$c_2=(0.5-0.25-0.25)/0.5=0$。所以 $q_2=\pm90^\circ$。
+正分支中，$q_1=45^\circ-\operatorname{atan2}(0.5,0.5)=0$；负分支中，$q_1=45^\circ-\operatorname{atan2}(-0.5,0.5)=90^\circ$。
+两组解为 $(0^\circ,90^\circ)$ 与 $(90^\circ,-90^\circ)$。前者末端朝向 $90^\circ$，后者朝向 $0^\circ$。因此“同一末端位置”与“同一末端完整位姿”不是同一约束。
+\end{examplebox}
+
+\begin{figure}[htbp]
+\centering\includegraphics[width=0.68\linewidth]{figures/mk_ik_branches.pdf}
+\caption{相同目标位置的两个逆解分支。两根末端小箭头显示不同末端朝向。额外指定朝向可能排除一个分支，也可能使任务完全不可达。}
+\end{figure}
+
+\begin{examplebox}[算例 一个非整角目标逐步代数值]
+目标 $(0.6,0.4)^\mathsf T\,\mathrm m$，$c_2=(0.36+0.16-0.5)/0.5=0.04$。所以 $q_2=\pm87.707557^\circ$。末端方向为 $\operatorname{atan2}(0.4,0.6)=33.690068^\circ$；正分支的第二项为 $43.853779^\circ$，故 $q_1=-10.163711^\circ$。另一组为 $(77.543846^\circ,-87.707557^\circ)$。把每组代回正运动学，都恢复 $(0.6,0.4)$，这是逆解计算必须执行的闭环核对。
+\end{examplebox}
+
+\subsection{二维位置可达不代表二维位姿可达}
+仍要求位置 $(0.5,0.5)$，若额外指定朝向 $45^\circ$，则第二杆必须等于 $0.5(\cos45^\circ,\sin45^\circ)$。第一杆端点应为
+\[
+ (0.5,0.5)-0.5(\sqrt2/2,\sqrt2/2)
+ =(0.146447,0.146447)\,\mathrm m.
+\]
+它到基座的距离为 $0.207107\,\mathrm m$，不等于第一杆固定长度 $0.5\,\mathrm m$，因此无解。这是任务维数过多的具体表现。把一个二维可达位置提交给带姿态约束的 IK 求解器，返回失败并不必然是算法不好。
+
+\section{数值逆解是反复使用局部近似}
+\subsection{先定义残差 再明确更新方向}
+位置残差定义为 $r=p_d-p(q)$，采用“目标减当前”，仅用于本节求修正量。由一阶展开 $p(q+\Delta q)\approx p(q)+J(q)\Delta q$，希望 $J\Delta q\approx r$。在方阵可逆且远离奇异时，$\Delta q=J^{-1}r$；对非方阵可用伪逆。一次修正后必须重新计算非线性的 $p$ 和 $J$，不能把第一步的雅可比一直重复使用。
+
+\begin{examplebox}[算例 一次牛顿修正并不直接等于最终答案]
+从 $q=(0,\pi/2)$ 出发，要移到 $(0.45,0.55)\,\mathrm m$。当前 $p=(0.5,0.5)$，残差 $r=(-0.05,0.05)^\mathsf T$，雅可比为
+\[
+ J=\begin{bmatrix}-0.5&-0.5\\0.5&0\end{bmatrix}.
+\]
+解 $J\Delta q=r$：第二行给出 $\Delta q_1=0.1$，第一行给出 $\Delta q_2=0$。新关节角 $(0.1,\pi/2)$ 的真实末端为 $(0.447585,0.547419)\,\mathrm m$，仍有约 $3.535\,\mathrm{mm}$ 位置误差。局部线性近似消除了主要误差，却没有消除二阶曲率误差，必须继续迭代。
+\end{examplebox}
+
+\subsection{阻尼最小二乘从代价函数推导}
+接近奇异时，伪逆中的 $1/\sigma$ 可能很大。改为求解
+\begin{equation}
+ \min_{\Delta q}\ \|J\Delta q-r\|_2^2+\lambda^2\|\Delta q\|_2^2,
+ \qquad\lambda>0.
+\end{equation}
+第一项要求完成任务，第二项惩罚过大的关节修正。求导等于零得到
+\begin{equation}
+ (J^\mathsf TJ+\lambda^2I)\Delta q=J^\mathsf Tr.
+\end{equation}
+等价形式为
+\begin{equation}\label{eq:dls}
+ \Delta q=J^\mathsf T(JJ^\mathsf T+\lambda^2I)^{-1}r.
+\end{equation}
+因为 $(J^\mathsf TJ+\lambda^2I)J^\mathsf T=J^\mathsf T(JJ^\mathsf T+\lambda^2I)$，两种表达作用相同；当任务维度比关节数小，后一形式求解更小的线性方程。实际实现仍使用求解器，不显式取逆。
+
+SVD 下，每个奇异方向的放大系数由 $1/\sigma$ 变为 $\sigma/(\sigma^2+\lambda^2)$。当 $\sigma\to0$，它趋于零，因此不会产生无穷大修正；代价是该方向的任务误差保留下来。阻尼不是让不可达方向变得可达。
+
+对上一个数字例子取 $\lambda=0.05$，得到 $\Delta q=(0.0990195,0.0009708)^\mathsf T\,\mathrm{rad}$，更新后末端为 $(0.447639,0.546931)\,\mathrm m$，误差约 $3.872\,\mathrm{mm}$。它比普通逆的一步误差略大，换来了限制放大能力。$\lambda$ 必须与使用的任务尺度一致；若米换成毫米，不能保持所有权重数值不变就认为算法等价。
+
+\subsection{完整迭代流程}
+一个能解释的局部 IK 过程需要以下环节：
+\begin{enumerate}
+\item 以当前或上一时刻关节角为初值，计算当前正运动学。
+\item 计算与任务定义一致的残差，例如位置用米、姿态用旋转对数，并明确两者的权重。
+\item 若位置与姿态分别达到容差，则接受结果；不能只把混合单位的一个范数当作唯一标准。
+\item 计算相同坐标约定的残差导数或局部几何雅可比，解 DLS 或受约束子问题。
+\item 限制步长或做线搜索，确保残差实际减小，同时检查限位及碰撞。
+\item 更新关节角，重新计算。超出迭代次数、步长过小却误差不降、或任务不可行时，明确报告失败。
+\end{enumerate}
+对于完整 $SE(3)$ 对数误差，远离目标时误差导数一般还包含对数映射雅可比。不能把任意姿态误差直接塞给任意六维雅可比而不核对。位置-only 例子不涉及这一额外旋转参数导数，因此适合先完整掌握。
+
+\begin{figure}[htbp]
+\centering\includegraphics[width=0.9\linewidth]{figures/mk_ik_convergence.pdf}
+\caption{从 $(0,\pi/2)$ 求解目标 $(0.45,0.55)$ 的 DLS 迭代。左图为真实末端逐步靠近目标；右图使用对数纵轴显示每步重新计算后的残差。}
+\end{figure}
+
+上一时刻解作为初值通常促进连续性，但不保证连续：路径穿越奇异位形、碰撞约束变化、任务突然跳变或某分支碰到限位时，局部解仍可能丢失。必要时应在规划层改变路径、任务优先级或姿态约束。
+
+
+\subsection{可达目标也可能让局部迭代原地不动}
+一个容易误判的例子：等长两连杆从 $q=(0,0)$ 完全伸直出发，目标是 $(0.9,0)\,\mathrm m$。目标在工作圆盘内，解析 IK 有解，但当前位置为 $(1,0)$，残差 $r=(-0.1,0)$，雅可比为 $\begin{bmatrix}0&0\\1&0.5\end{bmatrix}$。因此 $J^\mathsf Tr=0$，无论普通最小二乘还是加正阻尼，局部一步都会得到 $\Delta q=0$。
+
+这不是目标不存在，而是当前一阶模型看不见向内的二阶运动。若令 $q_1=\alpha$、$q_2=-2\alpha$，两杆绝对朝向为 $\alpha$ 与 $-\alpha$，末端为 $(\cos\alpha,0)$。取 $\cos\alpha=0.9$，有 $\alpha=25.841933^\circ$，便得到目标。这个有限动作的最初向内位移与 $\alpha^2$ 同阶，所以初始一阶梯度为零。可采用合适的非奇异初值、多起点、带几何信息的搜索或重新设计起始路径；单纯增大迭代次数不会让零修正自动变成正确方向。
+
+\section{把限位纳入求解 而不是算完后盲目截断}
+静态完整 IK 的约束 $p(q)=p_d$、姿态约束和碰撞距离一般是非线性的。所谓“QP 逆解”通常指每一步线性化后的二次规划（quadratic programming），不是整个非线性 IK 天然就是一个 QP。局部问题可写成
+\begin{equation}
+ \begin{aligned}
+ \min_{\Delta q}\quad&\tfrac12\|J\Delta q-r\|_W^2
+                  +\tfrac12\lambda^2\|\Delta q\|^2,\\
+ \text{满足}\quad&q_{\min}-q\le\Delta q\le q_{\max}-q,\\
+                 &-\Delta q_{\max}\le\Delta q\le\Delta q_{\max}.
+ \end{aligned}
+\end{equation}
+$\|z\|_W^2=z^\mathsf TWz$，其中 $W$ 是对称半正定任务权重。第一组不等式保证下一步位置不越限，第二组限制步长。碰撞距离也可在当前姿态附近线性化，但需要信赖域和后验检查以控制近似误差。
+
+若普通求解给出 $\Delta q$ 后，逐轴任意截断，原先 $J\Delta q\approx r$ 的关系可能被破坏；如果采用带约束求解，算法会在可行集合中寻找最佳折中。遇到无解，应减小任务、重新规划或停止推进，不应把任意截断结果宣称为“已到达”。
+
+\section{选解和模型校验要对应实际任务}
+多组解析逆解可按关节范围、碰撞、与当前角度距离、奇异程度及后续路径连续性筛选。关节距离要考虑周期关节的等价角，以及实际机械限位。六维任务中位置误差和姿态误差应分别报告，例如 $\|p-p_d\|$ 与 $\|\operatorname{Log}(R_d^\mathsf TR)^\vee\|$，而不是只报“综合误差 $10^{-4}$”。
+
+一条有用的几何验证链是：给定关节角，用独立几何公式或厂家已核实的姿态求 FK；对所得末端再做 IK；对每个候选解再次做 FK；最后确认关节限位和工具坐标。比较 FK 时，必须使用相同零位、关节正方向、安装姿态和 TCP。模型与真机相差一毫米，不应先用控制积分项掩盖，因为错误可能来自几何链条。
+
+\begin{examplebox}[算例 关节零偏如何变成端点误差]
+在标准姿态 $q=(0,\pi/2)$，若第一关节有 $\delta q_1=0.01\,\mathrm{rad}$ 零偏、第二关节正确，局部位置误差为
+\[
+ \delta p\approx J\begin{bmatrix}0.01\\0\end{bmatrix}
+ =\begin{bmatrix}-0.005\\0.005\end{bmatrix}\mathrm m,
+\]
+长度约为 $7.071\,\mathrm{mm}$。真实 FK 差为约 $(-5.025,4.975)\,\mathrm{mm}$，与线性估计接近。关节角看起来只差 $0.573^\circ$，末端已经出现毫米级误差。
+\end{examplebox}
+
+\section{计算练习与逐步解答}
+\subsection*{题目}
+\begin{enumerate}
+\item 对等长两连杆，计算 $q=(45^\circ,0^\circ)$ 的末端位置与朝向。再计算 $q=(45^\circ,180^\circ)$ 的末端位置。
+\item 目标为 $(1.1,0)\,\mathrm m$ 时，用解析 IK 判断是否可达。再考虑目标 $(0.5,0.5)\,\mathrm m$，关节范围为
+\[
+q_1\in[-45^\circ,45^\circ],\qquad q_2\in[-100^\circ,100^\circ].
+\]
+根据这两个限位，筛选本章的两组逆解。
+\item 当前 $q=(0,\pi/2)$，目标位置微增量为 $(0.01,0.02)^\mathsf T\,\mathrm m$。用当前雅可比求无阻尼关节增量，并给出一阶重构结果。
+\item 法兰位姿为 $R_z(90^\circ)$、$p_f=(0.5,0.5,0)^\mathsf T\,\mathrm m$，TCP 在法兰内为 $(0.1,0,0)^\mathsf T\,\mathrm m$。求 TCP 在基座位置，说明是否可以直接加到基座 $x$ 分量。
+\end{enumerate}
+\subsection*{解答}
+\begin{enumerate}
+\item 第一种完全伸直，$p=(\cos45^\circ,\sin45^\circ)=(\sqrt2/2,\sqrt2/2)\,\mathrm m$，朝向 $45^\circ$。第二种完全折叠，两根等长杆方向相反，位置为 $(0,0)$，朝向为 $225^\circ$。在原点位置不能唯一判断 $q_1$，这是特殊退化情况。
+\item 第一目标 $c_2=(1.21-0.5)/0.5=1.42>1$，不可达。第二目标的 $(0^\circ,90^\circ)$ 在给定范围内；$(90^\circ,-90^\circ)$ 超出第一关节范围，排除。限位筛选只说明这些角度可用，还未检查碰撞与动态约束。
+\item 第二行 $0.5\Delta q_1=0.02$，得 $\Delta q_1=0.04$。第一行 $-0.5(\Delta q_1+\Delta q_2)=0.01$，得 $\Delta q_2=-0.06$，单位 rad。代回 $J\Delta q=(0.01,0.02)^\mathsf T\,\mathrm m$。有限更新后真实位置仍有二阶误差，因此这只是一次局部修正。
+\item 旋转后的工具偏移为 $(0,0.1,0)^\mathsf T$，故 $p_{\rm TCP}=(0.5,0.6,0)^\mathsf T\,\mathrm m$。法兰局部 $x$ 轴当前指向基座 $y$ 轴，所以不能直接把 0.1 加到基座 $x$ 分量。
+\end{enumerate}
+
+\section*{本章与原稿的对应}
+本章整合 [A，第26--28页] 与 [B，第26--32页] 的正逆运动学、DH、PoE 和 IK 方法；把“IK 用 QP”限定为局部线性化求解，并补充可达任务维数、分支、限位、TCP 与零偏的完整算例。算法名称不能替代具体模型和约束的核对。

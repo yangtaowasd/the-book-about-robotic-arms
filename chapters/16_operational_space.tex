@@ -1,0 +1,341 @@
+\chapter{操作空间控制与七轴主任务和零空间}
+\label{ch:operational_space}
+
+七个关节不等于末端有七个独立空间运动方向。完整末端位姿通常包含三维位置和三维姿态，共六维；在雅可比满行秩时，七轴机械臂还剩一维瞬时自运动。理解这条维数关系，才能正确讨论“末端柔顺”和“肘部柔顺”。本章从关节动力学推导末端动力学，再用可手算反例区分运动学零空间与力矩零空间。
+
+\section{从关节加速度推到任务加速度}
+
+设所选任务有 $m$ 个独立速度分量，关节有 $n$ 维，$J\in\mathbb R^{m\times n}$。先写
+\begin{equation}
+v_x=J(q)\dot q,
+\qquad a_x=\dot v_x=J\ddot q+\dot J\dot q.
+\end{equation}
+对于平移任务，$v_x=\dot x$、$a_x=\ddot x$。对于完整几何任务，本书用 $v_x=[v^\top,\omega^\top]^\top$，其中 $\omega$ 是角速度，不能把它直接当成欧拉角导数。
+
+令 $h=C\dot q+g+\tau_f$，并假设外部作用只来自已知任务端口，$\tau_{\rm ext}=J^\top F_{\rm ext}$。由动力学得到
+\begin{align}
+\ddot q&=M^{-1}(\tau_{\rm cmd}-h+J^\top F_{\rm ext}),\\
+a_x&=JM^{-1}\tau_{\rm cmd}-JM^{-1}h
++\dot J\dot q+JM^{-1}J^\top F_{\rm ext}.
+\label{eq:cf_task_acc}
+\end{align}
+定义
+\begin{equation}
+A_x=JM^{-1}J^\top,\qquad
+\Lambda=A_x^{-1}.
+\label{eq:cf_lambda}
+\end{equation}
+当 $M\succ0$ 且 $J$ 满行秩时，$A_x\succ0$，因此逆存在。$\Lambda$ 称为操作空间惯量矩阵。平移块的单位类似质量；旋转块类似转动惯量；混合块含有不同单位，因此不能不做尺度处理就比较全部元素大小。
+
+若取 $\tau_{\rm cmd}=J^\top F+\tau_{\rm null}$，并且 $JM^{-1}\tau_{\rm null}=0$，将式\eqref{eq:cf_task_acc}左乘 $\Lambda$，得到
+\begin{equation}
+\Lambda a_x+\eta=F+F_{\rm ext},
+\qquad \eta=\Lambda JM^{-1}h-\Lambda\dot J\dot q.
+\end{equation}
+若把 $h$ 分开，可写成科氏速度项 $\mu$、重力项 $p_g$ 和摩擦项：
+\begin{align}
+\mu&=\Lambda(JM^{-1}C\dot q-\dot J\dot q),\\
+p_g&=\Lambda JM^{-1}g,\qquad
+p_f=\Lambda JM^{-1}\tau_f.
+\end{align}
+因此期望任务加速度 $a_d$ 对应控制力
+\[
+F=\Lambda a_d+\mu+p_g+p_f.
+\]
+$\dot J\dot q$ 表示雅可比本身变化造成的速度映射变化，快速运动时不能随意删掉。操作空间方法的历史来源可参阅 Khatib 的原始工作\cite{khatib}；这里的符号与数值计算均按本书约定重新展开。
+
+\section{完整算出两连杆的任务惯量}
+
+取统一教学两连杆：$l_1=l_2=0.5\,\mathrm{m}$，$m_1=m_2=1\,\mathrm{kg}$，质心均在连杆中点，质心转动惯量均为 $1/48\,\mathrm{kg\,m^2}$。在 $q_1=0,q_2=\pi/2$、速度为零时，第6章动力学给出
+\[
+M=\begin{bmatrix}5/12&1/12\\1/12&1/12\end{bmatrix},\quad
+J=\begin{bmatrix}-1/2&-1/2\\1/2&0\end{bmatrix},\quad
+ g=\begin{bmatrix}7.3575\\0\end{bmatrix}.
+\]
+先求 $M$ 的逆。行列式为 $(5-1)/144=1/36$，因此
+\[
+M^{-1}=\begin{bmatrix}3&-3\\-3&15\end{bmatrix}.
+\]
+再乘雅可比：
+\[
+JM^{-1}=\begin{bmatrix}0&-6\\1.5&-1.5\end{bmatrix},\qquad
+JM^{-1}J^\top=\begin{bmatrix}3&0\\0&0.75\end{bmatrix}.
+\]
+因此
+\begin{equation}
+\Lambda=\begin{bmatrix}1/3&0\\0&4/3\end{bmatrix}\,\mathrm{kg}.
+\end{equation}
+同一位形在两个平移方向的有效质量相差四倍；不能因两根连杆总质量是2 kg，就把所有方向的操作空间质量都写成2 kg。
+
+\begin{examplebox}[算例 16A 从期望末端加速度算到关节力矩再验算]
+速度为零，故 $\mu=0$、$\dot J\dot q=0$，先忽略摩擦。重力任务力为
+\[
+p_g=\Lambda JM^{-1}g=
+\begin{bmatrix}0\\14.715\end{bmatrix}\,\mathrm{N}.
+\]
+要求 $a_d=[1,2]^\top\,\mathrm{m/s^2}$，得到
+\[
+F=\Lambda a_d+p_g=
+\begin{bmatrix}0.333333\\17.381667\end{bmatrix}\,\mathrm{N}.
+\]
+映射到关节：
+\[
+\tau=J^\top F=
+\begin{bmatrix}8.524167\\-0.166667\end{bmatrix}\,\mathrm{N\,m}.
+\]
+最后不信任自己的推导，直接回代真实关节方程：
+\[
+\ddot q=M^{-1}(\tau-g)
+=\begin{bmatrix}3&-3\\-3&15\end{bmatrix}
+\begin{bmatrix}1.166667\\-0.166667\end{bmatrix}
+=\begin{bmatrix}4\\-6\end{bmatrix}.
+\]
+于是 $J\ddot q=[1,2]^\top$，确实得到所需末端加速度。这种“先正向设计，再回代原方程”的检查比只看公式外观可靠。
+\end{examplebox}
+
+接近奇异位形时，$J$ 某个奇异值变小，对应可实现运动能力下降，$\Lambda$ 在相关方向可能变得很大或不可定义。奇异不只是数值求逆麻烦，还表示机构本身暂时缺少某个独立运动方向；加正则化可以缓解数值爆炸，但不能创造实际不存在的自由度。
+
+\section{运动学零空间和力矩零空间不是同一个投影}
+
+\subsection{速度投影需要满足什么}
+
+动力学一致广义逆定义为
+\begin{equation}
+\bar J=M^{-1}J^\top\Lambda.
+\end{equation}
+在满行秩条件下，$J\bar J=I_m$。定义速度零空间投影
+\begin{equation}
+N=I_n-\bar J J.
+\end{equation}
+于是
+\[
+JN=J-J\bar JJ=0,\qquad N^2=N.
+\]
+$N\dot q_0$ 是不会瞬时改变主任务速度的关节速度分量。$N$ 一般不对称；它是在质量度量下构造的投影，而不是欧氏正交投影。
+
+\subsection{力矩投影需要满足什么}
+
+力矩首先经过 $M^{-1}$ 变成加速度，所以次任务不能影响主任务加速度的条件是
+\[
+JM^{-1}\tau_{\rm null}=0,
+\]
+不是简单的 $J\tau_{\rm null}=0$。采用
+\begin{equation}
+\tau_{\rm null}=N^\top\tau_0
+=(I-J^\top\bar J^\top)\tau_0
+\label{eq:cf_null_torque}
+\end{equation}
+即可验证：
+\begin{align}
+JM^{-1}N^\top
+&=JM^{-1}-JM^{-1}J^\top\bar J^\top\\
+&=JM^{-1}-\Lambda^{-1}\Lambda JM^{-1}=0.
+\end{align}
+上式用到了 $M,\Lambda$ 对称，因此 $\bar J^\top=\Lambda JM^{-1}$。这就是为什么速度形式用 $N$，力矩形式用 $N^\top$。如果某篇资料把力矩投影本身命名为 $N$，它也可以写 $N\tau_0$；关键是定义，不能只比较字母。
+
+\begin{examplebox}[算例 16B 普通投影为什么会在主任务上漏出加速度]
+用两个独立滑块构造最小冗余例子，广义坐标单位为米，质量矩阵 $M=\operatorname{diag}(1,4)\,\mathrm{kg}$，主任务为 $x=q_1+q_2$，故 $J=[1,1]$。此例不是两转动关节模型，专门用于看清投影。
+
+普通伪逆为 $J^+=[0.5,0.5]^\top$，对应欧氏投影
+\[
+N_k=I-J^+J=\begin{bmatrix}0.5&-0.5\\-0.5&0.5\end{bmatrix}.
+\]
+给原始次任务力 $\tau_0=[1,0]^\top\,\mathrm{N}$，投影后为 $[0.5,-0.5]^\top$。若只检查两力之和，会看到零；但真实加速度为
+\[
+M^{-1}N_k^\top\tau_0=
+\begin{bmatrix}0.5\\-0.125\end{bmatrix},
+\]
+所以主任务加速度为 $0.5-0.125=0.375\,\mathrm{m/s^2}$，并不为零。
+
+动力学一致计算则给
+\[
+\Lambda=(1+1/4)^{-1}=0.8,
+\quad\bar J=\begin{bmatrix}0.8\\0.2\end{bmatrix},
+\quad N=\begin{bmatrix}0.2&-0.8\\-0.2&0.8\end{bmatrix}.
+\]
+正确力矩投影为
+\[
+N^\top\tau_0=\begin{bmatrix}0.2\\-0.8\end{bmatrix}.
+\]
+真实加速度为 $[0.2,-0.2]^\top$，主任务加速度恰好为零。区别来自质量不同，而不是矩阵符号的排版习惯。
+\end{examplebox}
+
+\begin{figure}[htbp]
+\centering\includegraphics[width=.95\linewidth]{figures/cf_nullspace.pdf}
+\caption{相同原始次任务力经过不同投影，主任务加速度不同。右图显示加速度方向；零主任务要求两坐标加速度之和为零。}
+\end{figure}
+
+\section{为什么只做任务重力补偿可能仍让肘部动}
+
+任务重力项 $p_g=\Lambda JM^{-1}g$ 映射回关节后是 $J^\top p_g$。对非冗余可逆映射，这可能覆盖全部 $g$；对冗余系统，它通常只能提供主任务可见的那一部分。利用式\eqref{eq:cf_null_torque}的定义，恒等式为
+\begin{equation}
+g=J^\top\Lambda JM^{-1}g+N^\top g
+=J^\top p_g+N^\top g.
+\end{equation}
+因此只用 $J^\top p_g$，可能使末端瞬时不加速，而零空间构型仍受未补偿重力推动。
+
+\begin{examplebox}[算例 16C 末端没动但冗余坐标在漂]
+沿用两个滑块，设广义重力向量 $g=[1,0]^\top\,\mathrm{N}$。任务重力为 $p_g=0.8$，任务补偿给关节的力为 $J^\top p_g=[0.8,0.8]^\top$。
+
+真实净力是 $[0.8,0.8]^\top-[1,0]^\top=[-0.2,0.8]^\top$，加速度为 $[-0.2,0.2]^\top$。主任务 $x=q_1+q_2$ 的加速度为零，两个内部坐标却在反向移动。
+
+缺少的部分恰好是 $N^\top g=[0.2,-0.8]^\top$，把它加回去才得到完整 $g=[1,0]^\top$。这说明“只先补笛卡尔重力”需要明确目标：只保持选定任务，还是同时托住所有冗余自由度。
+\end{examplebox}
+
+一种容易避免重复补偿的结构是先在关节层补全部名义 $h$：
+\begin{equation}
+\tau_{\rm cmd}=\hat h+
+J^\top\Lambda(a_d-\dot J\dot q)+N^\top\tau_{\rm post}.
+\label{eq:cf_full_joint_comp}
+\end{equation}
+在精确模型条件下，它实现 $a_x=a_d+A_xF_{\rm ext}$，次任务瞬时不进入主任务加速度。另一种结构是在任务力中放入 $\mu+p_g+p_f$，同时用零空间项补齐剩余 $N^\top h$。两种账法可以等价，但不能既加完整 $g$，又在任务力中再次加完整投影重力而不做扣除。
+
+低速笛卡尔弹簧常采用
+\[
+\tau_{\rm cmd}=\hat g+\hat\tau_f+
+J^\top(-K_xe_x-D_x\tilde v_x)+N^\top\tau_{\rm post}.
+\]
+它与式\eqref{eq:cf_full_joint_comp}不是同一个精确加速度控制器：前者主要指定恢复力和阻尼，保留实际惯量；后者显式使用模型控制任务加速度。选择哪一条，应由目标手感、模型可信度和实现条件决定。
+
+\section{阻尼伪逆会牺牲严格解耦}
+
+为缓解近奇异问题，可定义正则化广义逆
+\[
+\bar J_\lambda=M^{-1}J^\top(A_x+\lambda^2I)^{-1},
+\qquad N_\lambda=I-\bar J_\lambda J.
+\]
+在位置与姿态混合任务中，正则项必须按统一的任务尺度或度量定义，$\lambda^2I$ 不能无视各行单位直接照抄。
+
+由代数展开：
+\begin{align}
+JM^{-1}N_\lambda^\top
+&=[I-A_x(A_x+\lambda^2I)^{-1}]JM^{-1}\\
+&=\lambda^2(A_x+\lambda^2I)^{-1}JM^{-1}.
+\end{align}
+$\lambda\ne0$ 时右边一般不为零。因此正则化使逆解更平滑，同时放弃严格零空间性质。也通常有 $N_\lambda^2\ne N_\lambda$，它不再是严格幂等投影。
+
+\begin{examplebox}[算例 16D 算出正则化带来的主任务泄漏]
+沿用滑块例子，$A_x=1.25$，取 $\lambda^2=0.25$。则
+\[
+\bar J_\lambda=\frac1{1.5}\begin{bmatrix}1\\0.25\end{bmatrix}
+=\begin{bmatrix}2/3\\1/6\end{bmatrix}.
+\]
+对 $\tau_0=[1,0]^\top$，
+\[
+N_\lambda^\top\tau_0=\begin{bmatrix}1/3\\-2/3\end{bmatrix},
+\quad JM^{-1}N_\lambda^\top\tau_0=\frac13-\frac16=\frac16.
+\]
+额外任务加速度为 $0.166667\,\mathrm{m/s^2}$。调大阻尼能减少奇异放大，但不能同时声称末端完全不受次任务影响。
+\end{examplebox}
+
+\section{七轴末端与肘部柔顺能独立到什么程度}
+
+对 $J\in\mathbb R^{6\times7}$，若秩为6，零空间维数为 $7-6=1$。完整末端位姿已经占用了六个独立瞬时方向，肘部可以沿剩下的一维自运动方向调整，不能在保持末端完整位姿的同时再任意指定肘部三维位置。
+
+常见姿态项为
+\[
+\tau_{\rm post}=-K_n(q-q_0)-D_n\dot q,
+\qquad \tau_{\rm null}=N^\top\tau_{\rm post}.
+\]
+$K_n$ 小表示对参考构型的恢复力较弱，$D_n$ 控制自运动中的速度阻尼。$K_n=0$ 并不违法，它可以服务于自由拖动；但这时构型可能没有恢复目标。是否需要位置型零空间项应由任务决定，而不是“七轴一定必须加弹簧”。
+
+需要同时明确四个限制：第一，投影保证的是当前模型和当前位形下的瞬时关系；第二，$N(q)$ 随构型变化；第三，饱和后实际力矩不再等于投影结果；第四，普通投影姿态弹簧并不自动继承一个全局无源性证明。完整稳定性需要连同主任务、补偿、时变投影和约束一起分析。
+
+例如低阻抗主任务与低阻抗零空间同时启用时，主要托举必须由重力补偿承担，不能指望两个很软的弹簧纠正很大的模型残差。若机械摩擦和死区较大，投影结构正确也可能出现“肘部推不动”；这不是零空间公式自动失效，而是可用外力尚未克服执行器非理想项。
+
+\section{姿态误差必须与角速度处在同一坐标约定}
+
+设 $R,R_d$ 都把工具坐标分量转到基座坐标。定义基座表达的相对旋转
+\[
+E=RR_d^\top,\qquad e_R=\operatorname{Log}(E)^\vee.
+\]
+$e_R$ 是当前姿态相对目标的旋转向量，单位为弧度，其正负与本书“实际减目标”的误差方向一致。$\vee$ 把反对称矩阵取回三维向量。若使用 $\operatorname{Log}(R_d^\top R)^\vee$，结果在目标坐标表达，必须再转换后才能与基座雅可比配合。
+
+\subsection{旋转向量导数不总等于角速度差}
+
+基座角速度满足 $\dot R=[\omega]_\times R$、$\dot R_d=[\omega_d]_\times R_d$，于是
+\begin{align}
+\dot E&=[\omega]_\times E-E[\omega_d]_\times\\
+&=[\omega-E\omega_d]_\times E.
+\end{align}
+令 $J_l(e_R)$ 为 SO(3) 左雅可比，即把旋转向量导数映射到相对旋转的空间角速度的矩阵，则
+\begin{equation}
+\dot e_R=J_l(e_R)^{-1}(\omega-E\omega_d).
+\end{equation}
+小误差下 $E\approx I$、$J_l^{-1}\approx I$，才有 $\dot e_R\approx\omega-\omega_d$。因此把姿态三维误差和角速度误差直接拼进欧氏六维 PD，是一种常用局部设计，需要知道近似范围。
+
+对固定目标和各向同性旋转刚度 $k_RI$，$-k_Re_R$ 与距离势能 $\tfrac12k_R\|e_R\|^2$ 相容；对各向异性 $K_R$，若严格采用势能 $\tfrac12e_R^\top K_Re_R$，基座力矩梯度为
+\[
+m_R=-J_l(e_R)^{-\top}K_Re_R,
+\]
+而 $-K_Re_R$ 是小误差近似。接近 $\pi$ 的旋转还涉及对数分支与轴方向不唯一，不能声称用一个光滑公式能在所有姿态上无条件全局收敛。
+
+\begin{examplebox}[算例 16E 十度误差不能把数字10直接送进弧度刚度]
+目标为 $R_d=I$，实际为绕基座 $z$ 轴正转 $10^\circ$，故 $e_R=[0,0,\pi/18]^\top$。取 $k_R=10\,\mathrm{N\,m/rad}$，恢复力矩为
+\[
+m_z=-10\frac{\pi}{18}=-1.74533\,\mathrm{N\,m}.
+\]
+如果把10度中的数字10直接代入，得到 $-100\,\mathrm{N\,m}$，相差约57.3倍。单位错误比高级算法选择更容易彻底破坏控制。
+\end{examplebox}
+
+\section{工具坐标的软硬怎样转换到基座}
+
+在同一参考点，仅改变坐标表达时，平移力和位移都按旋转变换。若工具系刚度为 $K_t$，基座系刚度应为
+\[
+K_b=R_{bt}K_tR_{bt}^\top.
+\]
+\begin{examplebox}[算例 16F 工具转45度后刚度矩阵出现耦合项]
+二维工具刚度为 $K_t=\operatorname{diag}(500,50)\,\mathrm{N/m}$，工具相对基座转 $45^\circ$：
+\[
+R=\frac1{\sqrt2}\begin{bmatrix}1&-1\\1&1\end{bmatrix}.
+\]
+逐项相乘得到
+\[
+K_b=\begin{bmatrix}275&225\\225&275\end{bmatrix}\,\mathrm{N/m}.
+\]
+若基座位移为 $[0.01,0]^\top$，恢复力为 $[-2.75,-2.25]^\top\,\mathrm{N}$。出现 $y$ 向恢复力是旋转后的各向异性弹簧应有行为，不一定是“坐标耦合错误”。如果希望基座 $x,y$ 互不耦合，就应该直接在基座定义对角刚度。
+\end{examplebox}
+
+\begin{figure}[htbp]
+\centering\includegraphics[width=.95\linewidth]{figures/cf_stiffness_frame.pdf}
+\caption{左图为旋转后的各向异性弹簧等能量椭圆，窄轴方向更硬；右图展示姿态角度显示与内部弧度运算的关系。}
+\end{figure}
+
+如果改变力旋量的参考点，而不只是旋转坐标，还必须加入力臂引起的力矩。例如力 $f$ 在距新参考点 $r$ 的位置作用，力矩项会增加 $r\times f$。相应速度变换也包含旋转引起的平移速度，二者通过功率不变联系。不能只旋转六维向量的前三项然后保留后三项不变。
+
+\section{把七轴回正问题分成可以测量的几件事}
+
+首先记录关节目标、实际角度、速度、发送力矩、实际力矩或电流、限幅状态、末端目标和模型末端位姿，并统一时间戳。若末端位姿来自同一套 FK，它只能说明控制器与自身模型的一致性；要判断绝对几何精度，还需外部测量。
+
+对静止或足够慢的回正过程，可把关节残差近似写成
+\[
+K_pe\approx\hat g-g-\tau_f+\tau_{\rm ext}
+\]
+或在任务空间解释恢复力 $-K_xe_x$。对于七轴，零空间弹簧与投影也参与平衡，不能只用 $J^\top K_xe_x$ 就唯一反推出所有模型误差。
+
+从相反两个方向接近同一目标，若停止偏差有明显方向相关，摩擦、回差或不同冗余构型是候选原因；若换姿态后偏差按重力方向改变，质量质心和安装姿态是候选原因；若只有某些位形出现严重响应变弱，应检查雅可比秩与任务尺度；若增益提高只让命令更常限幅，应先检查可实现力矩与轨迹要求。
+
+这些现象是排查证据，不是单凭曲线就能确诊。例如“左右方向主要由第一轴完成”只在具体机构、坐标和位形下可能近似成立，不能未读 URDF、未计算雅可比就断定 NERO 的所有方向响应原因。
+
+区分两层误差也很重要。若 $q_{\rm meas}$ 明显不同于 $q_d$，主要是关节跟踪或接口执行问题；若 $q_{\rm meas}\approx q_d$，但外部测得末端与 FK 不符，则应检查几何标定、零位、工具、底座和柔性。冗余臂比较时优先统一用 FK，不要把外部位姿做一次不受分支约束的 IK 后强行比较关节角。
+
+\section{计算练习与逐步解答}
+
+\textbf{练习 1}\quad 对滑块模型 $J=[1,1]$、$M=\operatorname{diag}(1,4)$，给次任务力 $\tau_0=[0,1]^\top$。计算动力学一致零空间力与加速度。
+
+\textbf{解}\quad $N^\top=\left[\begin{smallmatrix}0.2&-0.2\\-0.8&0.8\end{smallmatrix}\right]$，所以 $\tau_{\rm null}=[-0.2,0.8]^\top$。加速度为 $[-0.2,0.2]^\top$，两者之和为零，主任务不产生额外瞬时加速度。
+
+\textbf{练习 2}\quad 教学2R在 $q=(0,\pi/2)$、零速度、重力已完整补偿时，希望末端加速度为 $[0,3]^\top$。求额外任务力和关节力矩。
+
+\textbf{解}\quad $\Lambda=\operatorname{diag}(1/3,4/3)$，所以 $F=\Lambda a=[0,4]^\top\,\mathrm{N}$。$\tau=J^\top F=[2,0]^\top\,\mathrm{N\,m}$。回代 $M^{-1}\tau=[6,-6]^\top$，再乘 $J$ 得 $[0,3]^\top$，与要求一致。
+
+\textbf{练习 3}\quad 七轴臂只控制三维末端位置，位置雅可比秩为3。局部零空间维数是多少？如果再加入两个独立朝向约束且总体秩为5，剩多少？
+
+\textbf{解}\quad 秩零化度定理给 $\dim\mathcal N(J)=n-\operatorname{rank}J$。第一种为 $7-3=4$，第二种为 $7-5=2$。维数取决于独立约束的秩，不能仅按“发了几项命令”计数。限位、碰撞和奇异还会限制实际可用自运动。
+
+\textbf{练习 4}\quad 旋转刚度 $k_R=8\,\mathrm{N\,m/rad}$，绕一个轴的实际误差为 $-5^\circ$，求恢复力矩。
+
+\textbf{解}\quad 弧度误差为 $-5\pi/180=-0.0872665$，恢复力矩为 $-8(-0.0872665)=+0.698132\,\mathrm{N\,m}$。恢复方向与误差相反。该计算针对单轴旋转，避免了多轴大角度下旋转误差导数的额外几何关系。
+
+\section*{本章与原稿的对应}
+本章整合 [A，第29--30、44页] 与 [B，第55、83--86、122--123页]，并参考操作空间控制原始论文\cite{khatib}。补足了 $\Lambda$、$\bar J$、$N^\top$ 的推导和数值回代，纠正严格解耦、任务重力覆盖范围、正则化零空间、姿态误差坐标以及七轴冗余维数等容易影响真机实现的细节。

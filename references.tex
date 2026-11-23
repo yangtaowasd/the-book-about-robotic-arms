@@ -1,0 +1,134 @@
+% 已核对的参考资料；网页访问日期统一为 2026-11-23。
+% 使用 \url 而非不可断行的 \texttt，便于在正文宽度内排版。
+\begingroup
+\renewcommand{\bibname}{参考资料与进一步阅读}
+\begin{thebibliography}{99}
+\addcontentsline{toc}{chapter}{参考资料与进一步阅读}
+\small
+\setlength{\itemsep}{9pt}
+\setlength{\parskip}{2pt}
+\raggedright
+\urlstyle{same}
+
+\bibitem[A]{sourceA}
+《机械臂与机器人控制算法：从零开始的基础巩固手册》。用户提供的 PDF，共 90 页；本书简称原稿 A。各章所列的 A 页码按上传 PDF 的页面顺序计。原文件未给出可核实的正式作者与出版信息，本文不补写。
+
+\bibitem[B]{sourceB}
+《机械臂与仿真工程教材（数学及格也能懂版）》。用户提供的 PDF，共 129 页；本书简称原稿 B。各章所列的 B 页码按上传 PDF 的页面顺序计。原文件未给出可核实的正式作者与出版信息，本文不补写。
+
+\bibitem{khatib}
+Oussama Khatib.
+A Unified Approach for Motion and Force Control of Robot Manipulators: The Operational Space Formulation.
+IEEE Journal of Robotics and Automation, RA-3(1):43--53, 1987。
+作者所在研究组提供的论文原文：
+\url{https://khatib.stanford.edu/publications/pdfs/Khatib_1987_RA.pdf}。
+访问日期：2026-11-23。用于核对操作空间动力学、任务惯量与冗余控制的来源。
+
+\bibitem{ruckig}
+Lars Berscheid and Torsten Kröger.
+Jerk-limited Real-time Trajectory Generation with Arbitrary Target States.
+Proceedings of Robotics: Science and Systems XVII, 2021。
+DOI：\url{https://doi.org/10.15607/RSS.2021.XVII.015}。
+会议官方条目：\url{https://www.roboticsproceedings.org/rss17/p015.html}。
+Ruckig 官方文档：\url{https://docs.ruckig.com/}。
+访问日期：2026-11-23。正文中的软件能力范围以该文档所区分的状态到状态运动和中间航点情形为准。
+
+\bibitem{toppra}
+Hung Pham and Quang-Cuong Pham.
+A New Approach to Time-Optimal Path Parameterization Based on Reachability Analysis.
+IEEE Transactions on Robotics, 34(3):645--659, 2018。
+DOI：\url{https://doi.org/10.1109/TRO.2018.2819195}。
+作者维护的 TOPP-RA 文档：\url{https://hungpham2511.github.io/toppra/}。
+访问日期：2026-11-23。用于核对固定几何路径的时间参数化与可达性分析。
+
+\bibitem{lavalle}
+Steven M. LaValle.
+Planning Algorithms.
+Cambridge University Press, 2006。
+作者提供的完整电子版及勘误：\url{https://lavalle.pl/planning/}。
+访问日期：2026-11-23。第 4--5 章可继续学习构型空间、采样规划与概率完备性；第 14 章进一步讨论微分约束下的规划。
+
+\bibitem{niemeyer}
+Günter Niemeyer and Jean-Jacques E. Slotine.
+Stable Adaptive Teleoperation.
+IEEE Journal of Oceanic Engineering, 16(1):152--162, 1991。
+DOI：\url{https://doi.org/10.1109/48.64895}。
+出版方条目：\url{https://ieeexplore.ieee.org/document/64895/}。
+访问日期：2026-11-23。用于核对波变量、时延通道与无源性的理论来源。
+
+\bibitem{corke}
+Peter Corke.
+Robotics, Vision and Control: Fundamental Algorithms in MATLAB.
+第 2 版，Springer, 2017。
+出版方书目信息：\url{https://doi.org/10.1007/978-3-319-54413-7}。
+作者的视觉伺服配套资源：
+\url{https://petercorke.com/rvc2/v-visual-servoing/}。
+访问日期：2026-11-23。第 15--16 章对应图像与位姿视觉伺服。
+
+\bibitem{moveit}
+MoveIt 项目。
+Realtime Arm Servoing.
+MoveIt 官方文档，ROS 2 Humble 分支。
+\url{https://moveit.picknik.ai/humble/doc/examples/realtime_servo/realtime_servo_tutorial.html}。
+访问日期：2026-11-23。该链接对应正文讨论的 Humble 版本；其他版本的接口应查看其各自文档。
+
+\bibitem{ros2control}
+ros2\_control 项目。
+Controller Manager.
+ros2\_control 官方文档，Humble 分支。
+\url{https://control.ros.org/humble/doc/ros2_control/controller_manager/doc/userdoc.html}。
+访问日期：2026-11-23。用于核对控制循环、生命周期、更新率与抖动要求。
+
+\bibitem{jointtrajectory}
+ros2\_controllers 项目。
+joint\_trajectory\_controller.
+官方文档，Humble 分支。
+\url{https://control.ros.org/humble/doc/ros2_controllers/joint_trajectory_controller/doc/userdoc.html}。
+访问日期：2026-11-23。用于核对轨迹插补、命令与状态接口，以及各接口下的 PID 作用方式。
+
+\bibitem{mujocosim}
+MuJoCo 项目。
+Simulation.
+MuJoCo 官方文档，stable 分支。
+\url{https://mujoco.readthedocs.io/en/stable/programming/simulation.html}。
+访问日期：2026-11-23。用于核对模型与数据对象、正向计算、逆动力学和仿真步进的关系。
+
+\bibitem{mujocomodel}
+MuJoCo 项目。
+Modeling；XML Reference.
+MuJoCo 官方文档，stable 分支。
+\url{https://mujoco.readthedocs.io/en/stable/modeling.html}；
+\url{https://mujoco.readthedocs.io/en/stable/XMLreference.html}。
+访问日期：2026-11-23。模型指南解释机构树和建模方式；XML 参考手册定义具体字段的含义。
+
+\bibitem{mujocomputation}
+MuJoCo 项目。
+Computation.
+MuJoCo 官方文档，stable 分支。
+\url{https://mujoco.readthedocs.io/en/stable/computation/index.html}。
+另见 Modeling 的 Solver parameters 小节：
+\url{https://mujoco.readthedocs.io/en/stable/modeling.html#solver-parameters}。
+访问日期：2026-11-23。用于核对软接触、约束求解以及 \texttt{solref}、\texttt{solimp} 的参数语义。
+
+\bibitem{sutton}
+Richard S. Sutton and Andrew G. Barto.
+Reinforcement Learning: An Introduction.
+第 2 版，The MIT Press, 2018。ISBN：9780262039246。
+出版社官方书目及资源入口：
+\url{https://mitpress.mit.edu/9780262039246/reinforcement-learning/}。
+访问日期：2026-11-23。用于核对回报、折扣、策略与价值函数的基础定义；本书的机器人学习例子并不替代该书对学习算法的系统展开。
+
+\bibitem{modernrobotics}
+Kevin M. Lynch and Frank C. Park.
+Modern Robotics: Mechanics, Planning, and Control.
+Cambridge University Press, 2017。ISBN：9781107156302。
+作者官方教材主页：
+\url{https://hades.mech.northwestern.edu/index.php/Modern_Robotics}。
+作者提供的更新版第一版预印本（2019 年 12 月）：
+\url{https://hades.mech.northwestern.edu/images/2/25/MR-v2.pdf}。
+官方章节视频：\url{https://modernrobotics.northwestern.edu/}。
+访问日期：2026-11-23。
+这是贯通本书数学、刚体运动、运动学、动力学、轨迹与控制的进一步阅读；其中第 3、5、8、9、11 章分别对应刚体运动、速度与力、动力学、轨迹生成及机器人控制。预印本文件名中的 v2 表示更新版本，不应误写成正式的第 2 版教材。
+
+\end{thebibliography}
+\endgroup

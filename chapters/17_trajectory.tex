@@ -1,0 +1,290 @@
+\chapter{从目标点到连续轨迹}
+\label{ch:trajectory}
+
+把目标写成“关节走到 $1.2\,\mathrm{rad}$”，只说明了终点。电机还需要知道每一时刻该在哪里、该多快、该如何加减速。轨迹生成的任务，就是把一个终点变成连续的参考信号 $q_d(t),\dot q_d(t),\ddot q_d(t)$，并检查它是否超过机构、驱动器和任务允许的范围。
+
+\section{路径 轨迹 插补和控制的分工}
+
+\textbf{路径（path）}是几何曲线 $q(s)$，$s\in[0,1]$ 只表示进度，没有秒的单位。\textbf{时间律（time scaling）}是 $s(t)$，告诉我们第几秒走到路径的几成。二者复合为\textbf{轨迹（trajectory）} $q(t)=q(s(t))$。\textbf{插补（interpolation）}是在离散控制时刻求出连续轨迹的值。\textbf{反馈控制}根据参考和实际测量之间的差，计算位置、速度或力矩命令。
+
+例如，同一条 $0$ 到 $1\,\mathrm{rad}$ 的关节路径可以用 $1\,\mathrm{s}$ 或 $5\,\mathrm{s}$ 走完；它们的几何完全相同，但所需加速度、惯性力矩和发热不同。避障规划找到一条路，不能据此断言这条路可以直接执行。
+
+\begin{table}[htbp]\centering\small
+\begin{tabularx}{\linewidth}{p{25mm}XX}\toprule
+层次 & 输入和输出 & 需要回答的问题\\\midrule
+任务 & 起点 终点 工艺要求 & 相机应到哪里 面向哪里\\
+路径规划 & 环境与目标到 $q(s)$ & 连杆及工具是否碰撞\\
+时间参数化 & 路径与限值到 $s(t)$ & 速度 加速度 力矩是否可行\\
+周期插补 & 当前时间到参考状态 & 这一拍的 $q_d,\dot q_d,\ddot q_d$ 是多少\\
+反馈控制 & 参考和测量到执行器命令 & 如何克服重力 摩擦和扰动\\\bottomrule
+\end{tabularx}
+\caption{轨迹与控制的接口必须按物理量区分。}
+\end{table}
+
+MoveJ 通常描述关节空间的运动指令；MoveL 通常描述末端直线；MoveC 通常描述圆弧。MoveP 在不同厂家中可能指点到点位姿运动，也可能指连续工艺运动，不能仅凭名字判断轨迹。所谓 MIT 模式常见的是关节位置、速度、刚度、阻尼和前馈力矩组合接口，它属于执行层接口，不是一种路径算法。具体字段、单位和控制模式必须以该驱动器协议为准。
+
+\section{先亲手解出三次和五次多项式}
+
+\subsection{三次多项式为什么有四个系数}
+
+设运动从 $q_0$ 到 $q_f$，总时间 $T>0$，起止速度均为零。选
+\begin{equation}
+q(t)=a_0+a_1t+a_2t^2+a_3t^3.
+\end{equation}
+四个未知系数需要四个独立条件。由 $q(0)=q_0$ 和 $\dot q(0)=0$ 得 $a_0=q_0,a_1=0$。令 $\Delta=q_f-q_0$，另两个条件给出
+\begin{align}
+a_2T^2+a_3T^3&=\Delta,\\
+2a_2T+3a_3T^2&=0.
+\end{align}
+第二式除以 $T$ 后得 $a_2=-3a_3T/2$，代回第一式，得到 $a_3=-2\Delta/T^3$，于是
+\begin{equation}
+q(t)=q_0+\Delta(3s^2-2s^3),\qquad s=t/T.
+\end{equation}
+注意 $s$ 是无量纲数。对 $t$ 求导要再乘 $ds/dt=1/T$：
+\begin{align}
+\dot q&=\frac{\Delta}{T}(6s-6s^2),\\
+\ddot q&=\frac{\Delta}{T^2}(6-12s).
+\end{align}
+速度峰值在 $s=1/2$，为 $1.5|\Delta|/T$。如果在运动前后保持静止，外部加速度为零，而运动刚开始的加速度是 $6\Delta/T^2$，因此拼接处加速度跳变。一个区间内的多项式很光滑，不等于它与前后区间的拼接也很光滑。
+
+\subsection{五次多项式的六个边界条件}
+
+要让起止加速度也为零，再增加两个条件，并把次数增加到五次。采用无量纲写法
+\begin{equation}
+q(t)=q_0+\Delta h(s),\quad
+h(s)=b_0+b_1s+b_2s^2+b_3s^3+b_4s^4+b_5s^5.
+\end{equation}
+$h(0)=h'(0)=h''(0)=0$ 立即给出 $b_0=b_1=b_2=0$。终点条件构成
+\begin{equation}
+\begin{bmatrix}1&1&1\\3&4&5\\6&12&20\end{bmatrix}
+\begin{bmatrix}b_3\\b_4\\b_5\end{bmatrix}
+=\begin{bmatrix}1\\0\\0\end{bmatrix}.
+\end{equation}
+第二行减第一行的三倍：$b_4+2b_5=-3$；第三行减第二行的两倍：$4b_4+10b_5=0$。联立得 $b_5=6,b_4=-15,b_3=10$。
+\begin{align}
+h(s)&=10s^3-15s^4+6s^5,\\
+\dot q&=\frac{\Delta}{T}(30s^2-60s^3+30s^4),\\
+\ddot q&=\frac{\Delta}{T^2}(60s-180s^2+120s^3),\\
+\dddot q&=\frac{\Delta}{T^3}(60-360s+360s^2).
+\end{align}
+$\dddot q$ 叫\textbf{加加速度（jerk）}，角运动单位为 $\mathrm{rad/s^3}$。它描述加速度改变得多快，关系到力矩变化和柔性结构的激励。五次曲线的加速度可以与静止段连续拼接，但 jerk 在边界仍从零跳到非零。jerk 有界与 jerk 连续是两件事。
+
+\begin{examplebox}[完整算例 从零走到一点二弧度]
+取 $q_0=0,q_f=1.2\,\mathrm{rad},T=2\,\mathrm{s}$。
+\[
+q(t)=1.5t^3-1.125t^4+0.225t^5.
+\]
+在 $t=1\,\mathrm{s}$，$s=0.5$，所以 $h=0.5$，
+\[
+q=0.6\,\mathrm{rad},\quad \dot q=1.125\,\mathrm{rad/s},\quad \ddot q=0.
+\]
+加速度极值满足 $\dddot q=0$，即 $6s^2-6s+1=0$，得 $s=(3\pm\sqrt3)/6$。代回后
+\[
+|\ddot q|_{\max}=\frac{10\sqrt3}{3}\frac{|\Delta|}{T^2}
+=1.7321\,\mathrm{rad/s^2}.
+\]
+最大 jerk 在区间端点，为 $60|\Delta|/T^3=9\,\mathrm{rad/s^3}$。若速度上限只有 $1\,\mathrm{rad/s}$，这条两秒轨迹虽然终点正确，仍然不可执行。
+\end{examplebox}
+
+\begin{figure}[htbp]\centering
+\includegraphics[width=0.94\linewidth]{figures/rt_polynomials.pdf}
+\caption{相同位移和总时间下的三次与五次轨迹。五次曲线使起止加速度为零，但中间峰值速度更高，不能把“更平滑”误读成“所有峰值都更小”。}
+\end{figure}
+
+\subsection{从三个限值反算运动时间}
+
+对零速度、零加速度起止的五次曲线，速度、加速度、jerk 限制共同要求
+\begin{equation}
+T\ge\max\left\{
+\frac{1.875|\Delta|}{v_{\max}},\quad
+\sqrt{\frac{(10\sqrt3/3)|\Delta|}{a_{\max}}},\quad
+\sqrt[3]{\frac{60|\Delta|}{j_{\max}}}\right\}.
+\end{equation}
+取 $\Delta=1.2,v_{\max}=1,a_{\max}=2,j_{\max}=10$，三项分别为 $2.25,1.8612,1.9310\,\mathrm{s}$，故取 $T=2.25\,\mathrm{s}$。这只是\textbf{所选五次曲线家族内}满足这些限值的最小时间，不是所有可能轨迹中的时间最优解；也尚未检查力矩和碰撞。
+
+五次曲线常被称为“最小 jerk 轨迹”，这个称呼有前提：固定总时间与两端位置、速度、加速度，最小化 $\int_0^T\dddot q^2dt$。对 $q+\epsilon\eta$ 做变分，并三次分部积分，端点的 $\eta,\dot\eta,\ddot\eta$ 为零，得到 $\delta J=-2\int q^{(6)}\eta dt=0$，因此 $q^{(6)}=0$。这给出五次多项式。若加入中间点、障碍或力矩约束，不能继续照搬这个无约束结论。
+
+\subsection{起止速度不为零时怎样计算}
+
+令 $q(t)=\sum_{k=0}^{5}a_kt^k$，已知两端 $(q_0,v_0,\alpha_0)$ 和 $(q_f,v_f,\alpha_f)$。先得 $a_0=q_0,a_1=v_0,a_2=\alpha_0/2$，再求
+\begin{equation}
+\begin{bmatrix}T^3&T^4&T^5\\3T^2&4T^3&5T^4\\6T&12T^2&20T^3\end{bmatrix}
+\begin{bmatrix}a_3\\a_4\\a_5\end{bmatrix}
+=\begin{bmatrix}
+q_f-q_0-v_0T-\alpha_0T^2/2\\
+v_f-v_0-\alpha_0T\\
+\alpha_f-\alpha_0
+\end{bmatrix}.
+\end{equation}
+在程序中解线性方程即可，不要显式求逆。取 $T=2,q_0=0,v_0=0.2,\alpha_0=0,q_f=1,v_f=\alpha_f=0$，右端为 $(0.6,-0.2,0)^\mathsf T$，解为
+\[
+a_3=0.95,\qquad a_4=-0.7375,\qquad a_5=0.15.
+\]
+验算 $q(2)=0.4+7.6-11.8+4.8=1$；$\dot q(2)=0.2+11.4-23.6+12=0$；$\ddot q(2)=11.4-35.4+24=0$。如果 $T$ 极大或极小，应先用 $s=t/T$ 归一化，避免 $T^3,T^4,T^5$ 数量级悬殊。
+
+\section{梯形速度与七段 S 曲线}
+
+\subsection{梯形曲线由面积求出来}
+
+设位移绝对值为 $d$，加速度上限为 $a_m$，速度上限为 $v_m$。加速时间 $t_a=v_m/a_m$；加速与减速两块三角形的总面积为 $v_m^2/a_m$。因此
+\begin{equation}
+T=\begin{cases}
+d/v_m+v_m/a_m,&d\ge v_m^2/a_m,\\
+2\sqrt{d/a_m},&d<v_m^2/a_m.
+\end{cases}
+\end{equation}
+短距离情形没有匀速段，实际峰值速度为 $\sqrt{da_m}$。例如 $d=0.1\,\mathrm{rad},a_m=2,v_m=1$，因为 $0.1<0.5$，得到 $T=0.4472\,\mathrm{s}$，峰值速度 $0.4472\,\mathrm{rad/s}$。不能先算出负的匀速时间，再把负值强行置零而不重算其它段。
+
+\subsection{七段曲线的适用条件}
+
+令 jerk 上限为 $j_m$。当速度和加速度上限都能达到，且有非负匀速段时，前半段为：以 $+j_m$ 增加加速度、保持 $a_m$、以 $-j_m$ 降回零，再匀速。后三段对称减速。
+\begin{align}
+t_j&=a_m/j_m,\\
+t_a&=v_m/a_m-t_j,\\
+t_c&=d/v_m-(2t_j+t_a),\\
+T&=4t_j+2t_a+t_c=d/v_m+v_m/a_m+a_m/j_m.
+\end{align}
+这里 $t_a$ 是“恒加速度段”的时间，不包含两端 jerk 段。这个公式只在 $t_a\ge0,t_c\ge0$ 时成立。
+
+\begin{examplebox}[七段曲线的逐段时间]
+取 $d=3\,\mathrm{rad},v_m=1,a_m=2,j_m=8$。先算 $t_j=0.25\,\mathrm{s}$，$t_a=0.25\,\mathrm{s}$，$t_c=2.25\,\mathrm{s}$，总时间 $T=3.75\,\mathrm{s}$。七段持续时间是
+\[
+(0.25,0.25,0.25,2.25,0.25,0.25,0.25)\,\mathrm{s}.
+\]
+任意恒 jerk 段从 $(q_s,v_s,a_s)$ 起步，经过 $\delta t$ 后都有
+\[
+a=a_s+j\delta t,\quad v=v_s+a_s\delta t+\tfrac12j\delta t^2,
+\]
+\[
+q=q_s+v_s\delta t+\tfrac12a_s\delta t^2+\tfrac16j\delta t^3.
+\]
+第一段末 $a=2,v=0.25,q=0.020833$。把这三个值作为第二段初值，逐段累积即可得到整条曲线，不需要猜曲线形状。
+\end{examplebox}
+
+\begin{figure}[htbp]\centering
+\includegraphics[width=0.93\linewidth]{figures/rt_scurve.pdf}
+\caption{七段 S 曲线的速度、加速度和 jerk。jerk 分段常数，加速度连续；这些曲线来自逐段积分，位移总和为 $3\,\mathrm{rad}$。}
+\end{figure}
+
+极短距离时，加速度上限和速度上限可能都达不到。若只有四个等长 jerk 段，符号依次为 $+,-,-,+$，每段时间为 $t_j$，则 $a_{\mathrm{peak}}=j_mt_j$，$v_{\mathrm{peak}}=j_mt_j^2$，对称面积给出 $d=2j_mt_j^3$。于是 $t_j=(d/(2j_m))^{1/3}$。求完还要验证两个峰值小于相应限值。这说明 S 曲线必须分情况讨论；在线运动生成器把这些分支系统地封装起来。Ruckig 的官方文档明确区分状态到状态运动和含中间点的情况，不能把它概括为“任何避障任务都能直接时间最优”。\cite{ruckig}
+
+
+\subsection{两种中间分支也要会判断}
+
+如果达到加速度上限但没有匀速段，先令 $t_j=a_m/j_m$，由位移面积
+\[
+d=a_m(t_a+t_j)(t_a+2t_j)
+\]
+解得
+\[
+t_a=\frac{-3t_j+\sqrt{t_j^2+4d/a_m}}{2},\qquad t_c=0.
+\]
+必须验证 $t_a\ge0$，实际峰值速度 $a_m(t_a+t_j)\le v_m$。例如 $d=1,a_m=2,j_m=8,v_m=2$，$t_j=0.25$，$t_a\approx0.34307$，峰值速度约 $1.18614$，总时间 $4t_j+2t_a\approx1.68614\,\mathrm s$。
+
+另一种情况是先达到速度上限、却达不到加速度上限。此时
+\[
+t_j=\sqrt{v_m/j_m},\quad t_a=0,\quad
+ t_c=d/v_m-2t_j.
+\]
+验证 $j_mt_j\le a_m$ 和 $t_c\ge0$。例如 $d=1,v_m=0.5,j_m=8,a_m=4$，$t_j=0.25$，峰值加速度 $2$，匀速时间 $1.5$，总时间 $2.5\,\mathrm s$。至此，零起止速度和加速度的对称点到点运动有了完整的四类情形。非零边界速度或加速度会引入更多分支，需按新的边界状态重新求解。
+
+\section{多轴同步与时间缩放}
+
+七个关节分别得到最小可用时间后，在\textbf{零起止速度和加速度、同一曲线形状}的条件下，可以取最大的时间作为公共时间 $T$，再令 $q_i=q_{i0}+\Delta_i h(t/T)$。所有关节同时开始、同时结束。位移为零的轴可以保持不动，无需除以位移。
+
+把已有轨迹放慢 $\gamma>1$ 倍，令 $q_{\mathrm{new}}(t)=q_{\mathrm{old}}(t/\gamma)$，链式法则给出
+\begin{equation}
+\dot q_{\mathrm{new}}=\gamma^{-1}\dot q_{\mathrm{old}},\quad
+\ddot q_{\mathrm{new}}=\gamma^{-2}\ddot q_{\mathrm{old}},\quad
+\dddot q_{\mathrm{new}}=\gamma^{-3}\dddot q_{\mathrm{old}}.
+\end{equation}
+减速通常迅速降低惯性需求，但重力力矩不会随速度减小而消失。若初末速度必须保持某个非零数值，直接拉长时间会改变边界速度，必须重新求轨迹。
+
+\section{末端直线和圆弧怎样落到关节上}
+
+\subsection{关节直线一般不是末端直线}
+
+二维两连杆长度都为 $0.5\,\mathrm m$。起点 $q_A=(0,90^\circ)$，末端为 $(0.5,0.5)$；终点 $q_B=(60^\circ,60^\circ)$，末端为 $(0,\sqrt3/2)$。关节插值到一半，$q=(30^\circ,75^\circ)$，由正运动学
+\[
+p=\begin{bmatrix}0.5\cos30^\circ+0.5\cos105^\circ\\0.5\sin30^\circ+0.5\sin105^\circ\end{bmatrix}
+=\begin{bmatrix}0.30360\\0.73296\end{bmatrix}\mathrm m.
+\]
+而末端直线的中点是 $(0.25,0.68301)\,\mathrm m$，两者相差约 $0.0733\,\mathrm m$。即使关节跟踪误差为零，MoveJ 的末端仍不会自动走直线。
+
+真正的末端直线先规定 $p(s)=p_A+s(p_B-p_A)$，再逐点求逆解。在上述中点，
+\[
+\cos q_2=\frac{p_x^2+p_y^2-l_1^2-l_2^2}{2l_1l_2}\approx0.05801.
+\]
+选择与起点连续的 $q_2>0$ 分支，$q_2\approx86.674^\circ$，$q_1\approx26.56^\circ$。它与关节插值的中点明显不同。
+
+\begin{figure}[htbp]\centering
+\includegraphics[width=0.93\linewidth]{figures/rt_cartesian.pdf}
+\caption{同一对关节起止状态对应的两种路径。左图看末端几何，右图看关节随进度的变化。路径选在哪个空间，决定中间状态。}
+\end{figure}
+
+\subsection{姿态和圆弧的参数化}
+
+姿态使用同一个进度 $s(t)$。给定两端旋转矩阵，可写
+\begin{equation}
+R(s)=R_A\exp\!\left(s\log(R_A^\mathsf TR_B)\right).
+\end{equation}
+若用四元数，先确保相邻四元数点积非负，再用球面插值 SLERP；在相对转角接近 $\pi$ 时须明确选定的轴和分支。欧拉角逐分量插值在特定小角度、远离奇异的场景可以使用，但它不等于最短旋转路径，不应当作一般姿态插值算法。
+
+圆弧可用圆心 $c$、正交单位基 $u,v$、半径 $r$ 和角度 $\theta(s)$ 表示：
+\begin{equation}
+p(s)=c+r\big(u\cos\theta(s)+v\sin\theta(s)\big).
+\end{equation}
+例如平面圆弧 $c=(0.4,0.4),r=0.1,\theta=\pi s/2$。在 $s=0.5$，$p=(0.47071,0.47071)\,\mathrm m$。若匀速转角 $\dot\theta=1\,\mathrm{rad/s}$，切向速度为 $r\dot\theta=0.1\,\mathrm{m/s}$，法向加速度为 $r\dot\theta^2=0.1\,\mathrm{m/s^2}$。所以“沿路径匀速”不代表空间加速度为零。
+
+\section{给定路径后的时间最优参数化}
+
+设几何路径已经无碰撞。对 $q(s(t))$ 连续求两次导数：
+\begin{equation}
+\dot q=q'(s)\dot s,\qquad
+\ddot q=q'(s)\ddot s+q''(s)\dot s^2.
+\end{equation}
+撇号表示对 $s$ 求导，点表示对时间求导，不能互换。令 $x=\dot s^2\ge0$，则在正向运动 $\dot s>0$ 时 $dx/ds=2\ddot s$。每个关节的加速度约束变成
+\begin{equation}
+-a_{i,\max}\le q_i'(s)\ddot s+q_i''(s)x\le a_{i,\max}.
+\end{equation}
+在固定的 $s$ 上，这是关于 $(x,\ddot s)$ 的线性不等式。刚体惯性和科氏项也可整理成 $a(s)\ddot s+b(s)x+g(s)$，但速度相关摩擦、jerk 和接触切换需要另行处理，不能全部无条件塞进同一个线性形式。
+
+\begin{examplebox}[一段路径上的可行加速度区间]
+某一点有 $q_1'=2,q_1''=0.5$，关节加速度限值为 $3$，当前 $\dot s=1$，因此 $x=1$。约束为 $-3\le2\ddot s+0.5\le3$，故 $-1.75\le\ddot s\le1.25$。
+若另一个关节给出 $-0.8\le\ddot s\le0.9$，共同可行区间是 $[-0.8,0.9]$。规划器不能只采用第一关节允许的 $1.25$，必须取所有约束的交集。若交集为空，就需降低路径速度，或重新规划几何路径。
+\end{examplebox}
+
+在最简单的双积分器、固定路径、仅速度和加速度约束问题中，加速到上限再尽可能晚地制动会产生时间最优解。一般路径含曲率和多个约束时，仍需系统地求可行速度包络与切换点。TOPP-RA 用可达性分析求时间参数化；它保留给定路径，作用与在线状态到状态轨迹生成不同。\cite{toppra}
+
+\section{构型空间与避障为什么要检查整段}
+
+\textbf{构型空间（configuration space）}把一整组关节角看作一个点。二维两关节机械臂的构型空间是一张 $(q_1,q_2)$ 图；七轴机械臂则是七维空间。障碍物在工作空间中只是一个圆或方块，在构型空间中却可能变成复杂区域，因为任何一段连杆和工具都不能碰撞。
+
+\begin{figure}[htbp]\centering
+\includegraphics[width=0.95\linewidth]{figures/rt_cspace.pdf}
+\caption{圆障碍物对应的两关节构型空间禁区。两端姿态都无碰撞，连接它们的关节直线仍可穿过禁区。右图由逐点检查两段连杆到圆心的距离计算，未包含连杆厚度以外的额外安全余量。}
+\end{figure}
+
+RRT 的基本过程是随机取构型 $q_{\rm rand}$，在现有树上找最近节点 $q_{\rm near}$，沿二者方向走一小步得到 $q_{\rm new}$，仅当整段连接有效才加入树。RRT-Connect 从起终点两端生长并尝试连接。它们适合高维查询，但输出一般仍需路径简化和时间参数化。\textbf{概率完备}表示在相应假设下，若存在具有足够间隙的可行路径，采样数趋于无穷时找到解的概率趋于一；有限时间内没有解，不能据此证明问题不可行。\cite{lavalle}
+
+CHOMP、STOMP、TrajOpt 等把离散路径或轨迹作为优化变量，用平滑代价和碰撞代价改进它，通常存在局部最优。图搜索和采样搜索寻找路径，轨迹优化改良路径，时间参数化赋予时间，它们可以组合。所有后处理都可能改变几何，必须重新检查碰撞。特别是拐角处\textbf{圆滑过渡（blending）}通常主动偏离原航点；如果航点必须精确通过，就要降低速度或在该点停下。
+
+\section{计算练习与解答}
+
+\subsection*{题一 五次轨迹的时间}
+一个关节移动 $0.8\,\mathrm{rad}$，限值 $v_m=0.5,a_m=1,j_m=4$。求零起止五次曲线的可用最短时间。
+
+解：三个下界为 $1.875\times0.8/0.5=3.0\,\mathrm{s}$，$\sqrt{5.7735\times0.8}=2.1491\,\mathrm{s}$，$\sqrt[3]{60\times0.8/4}=2.2894\,\mathrm{s}$。故取 $T=3.0\,\mathrm{s}$。随后还需核查力矩；重力上限并不会因拉长到三秒自动满足。
+
+\subsection*{题二 变速回放}
+轨迹原峰值速度 $0.6$、加速度 $1.2$、jerk $3$，将总时间缩短到原来的 $0.8$，求新峰值。
+
+解：$\gamma=0.8$，故速度 $0.6/0.8=0.75$，加速度 $1.2/0.8^2=1.875$，jerk $3/0.8^3=5.8594$。加速回放时，jerk 的增长比速度快得多。
+
+\subsection*{题三 可行区间}
+若 $q'=1,q''=-2,\dot s=0.5$，关节加速度范围为 $[-1,1]$，求 $\ddot s$ 范围。
+
+解：$\dot s^2=0.25$，故 $\ddot q=\ddot s-0.5$。由 $-1\le\ddot s-0.5\le1$ 得 $-0.5\le\ddot s\le1.5$。若速度继续增加，曲率项也改变，不能把此区间当成整条路径的常数。
+
+\section*{本章与原稿的对应}
+本章整合 [A，第52--60页] 与 [B，第87--93页]。补出多项式系数、峰值和 S 曲线的分支条件，修正“轨迹平滑就自动无碰撞”“所有 S 曲线都适用同一总时间公式”等容易产生的误读。

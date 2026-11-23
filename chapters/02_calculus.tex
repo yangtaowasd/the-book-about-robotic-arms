@@ -1,0 +1,399 @@
+\chapter{微积分 微分方程和信号变换}\label{ch:calculus}
+\section{导数把位置变化变成速度}
+设关节角 $q(t)$ 随时间变化。时间区间 $[t,t+h]$ 上的平均速度为 $[q(t+h)-q(t)]/h$。令区间越来越短，若极限存在，就得到导数
+\begin{equation}
+ \dot q(t)=\lim_{h\to0}\frac{q(t+h)-q(t)}{h}.
+\end{equation}
+导数描述“这一瞬间的变化率”，不是当前位置除以当前时间。例如 $q(t)=t^2$ 时，$q(2)=4$，但瞬时速度为 $\dot q(2)=4$，而 $q(2)/2=2$ 只是从零时刻起的平均速度。
+
+\begin{examplebox}[算例 从轨迹逐次求导并检查单位]
+令
+\[
+ q(t)=0.2+0.3t^2-0.1t^3\quad(0\le t\le2\,\mathrm s),
+\]
+系数包含使结果为 rad 的相应单位。逐项求导得到
+\[
+ \dot q=0.6t-0.3t^2,
+ \qquad\ddot q=0.6-0.6t,
+ \qquad\dddot q=-0.6.
+\]
+在 $t=1\,\mathrm s$ 时，角度 $q=0.4\,\mathrm{rad}$，速度 $0.3\,\mathrm{rad/s}$，加速度为零，加加速度（jerk）为 $-0.6\,\mathrm{rad/s^3}$。加速度为零只表示该瞬间速度不再增加，不表示关节停止。
+\end{examplebox}
+
+积分是累积变化。若 $\dot q(t)=v(t)$，则
+\begin{equation}
+ q(t)=q(0)+\int_0^t v(\xi)\,d\xi.
+\end{equation}
+$\xi$ 是积分内部的时间变量，用来避免与上限 $t$ 混淆。若关节以 $0.2\,\mathrm{rad/s}$ 运动 $0.5\,\mathrm s$，角度增加 $0.1\,\mathrm{rad}$。力矩对角度的积分是做功，而不是力矩对时间积分：$W=\int\tau\,dq$，单位为焦耳；后者对应角动量变化。
+
+\section{偏导数 链式法则与线性化}
+\subsection{一维泰勒展开是局部直线近似}
+在 $q_0$ 附近，光滑函数满足
+\begin{equation}
+ f(q_0+\delta q)=f(q_0)+f'(q_0)\delta q
+ +\frac12 f''(q_0)(\delta q)^2+\cdots.
+\end{equation}
+保留一阶项称为线性化（linearization）。它只在小邻域里有效，忽略项通常为二阶小量。三角函数求导按弧度进行；如果输入数值用度，需要额外乘 $\pi/180$。
+\begin{examplebox}[算例 用导数估计连杆端点的小位移]
+单杆长度 $l=0.5\,\mathrm m$，横坐标 $x(q)=l\cos q$。在 $q_0=60^\circ=\pi/3$ 附近，关节增加 $\delta q=0.02\,\mathrm{rad}$：
+\[
+ x(q_0)=0.25,\quad x'(q_0)=-0.5\sin(\pi/3)=-0.433013.
+\]
+故线性估计为 $x\approx0.25-0.433013\times0.02=0.241340\,\mathrm m$。精确值为 $0.5\cos(\pi/3+0.02)=0.241290\,\mathrm m$，相差约 $0.0494\,\mathrm{mm}$。二阶项为 $\frac12(-0.25)(0.02)^2=-0.00005\,\mathrm m$，正好解释主要误差。
+\end{examplebox}
+
+\begin{figure}[htbp]
+\centering\includegraphics[width=0.86\linewidth]{figures/mk_linearization.pdf}
+\caption{连杆横坐标曲线及在 $60^\circ$ 处的切线。放大图显示线性化误差随关节增量增大；“雅可比乘增量”是局部关系。}
+\end{figure}
+
+\subsection{多变量时把每个输入的影响分开算}
+对 $f(q_1,q_2)$，偏导数 $\partial f/\partial q_1$ 表示暂时固定 $q_2$，只改变 $q_1$ 的影响。若两者都随时间变化，则链式法则给出
+\begin{equation}
+ \frac{df}{dt}=\frac{\partial f}{\partial q_1}\dot q_1
+ +\frac{\partial f}{\partial q_2}\dot q_2.
+\end{equation}
+将多个输出的偏导数排成矩阵，便得到雅可比。对位置 $p=f(q)$，
+\begin{equation}
+ \dot p=J_p(q)\dot q,\qquad
+ \ddot p=J_p(q)\ddot q+\dot J_p(q,\dot q)\dot q.
+\end{equation}
+第二式来自乘积求导。$\dot J_p\dot q$ 不是装饰项：即使关节速度不变，端点沿圆弧运动仍有向心加速度。例如单杆 $p=(l\cos q,l\sin q)^\mathsf T$，$\ddot q=0$ 时，$\ddot p=-l\dot q^2(\cos q,\sin q)^\mathsf T$。
+
+\subsection{差分为何放大测量噪声}
+程序看不到无限短的 $h$，常用 $\hat{\dot q}_k=(q_k-q_{k-1})/T_s$，其中 $T_s$ 是采样周期。若两次位置噪声独立、方差均为 $\sigma_q^2$，差分噪声方差为
+\begin{equation}
+ \sigma_{\dot q}^2=\frac{2\sigma_q^2}{T_s^2}.
+\end{equation}
+若 $\sigma_q=10^{-4}\,\mathrm{rad}$，$T_s=0.005\,\mathrm s$，速度噪声标准差为 $\sqrt2\times10^{-4}/0.005=0.02828\,\mathrm{rad/s}$。采样改为 1 ms，但仍直接做这类差分，标准差会上升至 $0.14142\,\mathrm{rad/s}$。更快采样有益，但必须与合适的估计、滤波和传感器特性配合；不能把“采得快”直接等同于“数值导数更干净”。
+
+\section{一阶微分方程完整解一次}
+常微分方程（ordinary differential equation，ODE）将未知函数与其时间导数联系起来。方程的阶数是出现的最高阶导数。给定初值，是为了从一族可能轨迹中确定实际那一条。
+
+考虑单关节在忽略重力等项后的速度方程
+\begin{equation}
+ J_r\dot\omega+b\omega=\tau_0,
+ \quad J_r=0.1\,\mathrm{kg\,m^2},\quad
+ b=0.2\,\mathrm{N\,m\,s/rad}.
+\end{equation}
+这里 $J_r$ 是转动惯量，避免与雅可比矩阵 $J$ 混淆。恒力矩取 $\tau_0=0.4\,\mathrm{N\,m}$，两边除以 $J_r$ 得 $\dot\omega+2\omega=4$。乘积分因子 $e^{2t}$：
+\begin{equation}
+ \frac{d}{dt}(e^{2t}\omega)=4e^{2t}.
+\end{equation}
+积分得 $e^{2t}\omega=2e^{2t}+C$，即 $\omega=2+Ce^{-2t}$。初始静止 $\omega(0)=0$ 给出 $C=-2$，故
+\begin{equation}
+ \omega(t)=2(1-e^{-2t})\,\mathrm{rad/s}.
+\end{equation}
+平衡速度 $\omega_\infty=\tau_0/b=2\,\mathrm{rad/s}$；时间常数 $T_c=J_r/b=0.5\,\mathrm s$。$t=T_c$ 时达到最终变化量的 $1-e^{-1}=63.21\%$，$t=3T_c$ 时达到 $95.02\%$，$t=5T_c$ 时达到 $99.33\%$。
+\begin{examplebox}[算例 速度已经接近稳定 角度仍然持续变化]
+在 $t=1\,\mathrm s$ 时，$\omega=2(1-e^{-2})=1.729329\,\mathrm{rad/s}$。再积分，且 $q(0)=0$：
+\[
+ q(t)=\int_0^t2(1-e^{-2\xi})\,d\xi
+ =2t-(1-e^{-2t}).
+\]
+于是 $q(1)=1.135335\,\mathrm{rad}$。速度趋于常数不意味着位置趋于常数。本例仅研究速度阻尼，未设置回到某个位置的弹簧或位置反馈。
+\end{examplebox}
+
+一般一阶系统 $T_c\dot y+y=Ku$ 对常值输入 $u_0$ 的解是 $y(t)=Ku_0+[y(0)-Ku_0]e^{-t/T_c}$，前提 $T_c>0$。这同一个数学结构可以描述电流建立、低通滤波、速度阻尼或某些热过程，具体单位由应用决定。
+
+\section{二阶微分方程解释振荡和阻尼}
+\subsection{从特征根得到响应形状}
+质量弹簧阻尼模型为
+\begin{equation}
+ m\ddot x+c\dot x+kx=F(t).
+\end{equation}
+$m$ 为质量，单位 kg；$c$ 为黏性阻尼，单位 $\mathrm{N\,s/m}$；$k$ 为刚度，单位 $\mathrm{N/m}$。先令外力为零，猜解 $x=e^{st}$。因 $\dot x=se^{st}$、$\ddot x=s^2e^{st}$，除去非零因子 $e^{st}$ 后得到特征方程
+\begin{equation}
+ ms^2+cs+k=0.
+\end{equation}
+定义无阻尼自然角频率与阻尼比
+\begin{equation}
+ \omega_n=\sqrt{k/m},\qquad
+ \zeta=\frac{c}{2\sqrt{km}},
+\end{equation}
+便得到 $s_{1,2}=-\zeta\omega_n\pm\omega_n\sqrt{\zeta^2-1}$。
+
+若 $0<\zeta<1$，根为共轭复数 $-\zeta\omega_n\pm j\omega_d$，其中 $\omega_d=\omega_n\sqrt{1-\zeta^2}$，解是指数衰减乘正弦或余弦。$\zeta=1$ 时是重实根，齐次解为 $(C_1+C_2t)e^{-\omega_nt}$；$\zeta>1$ 时为两个不同的负实根，解是两个衰减指数之和。若 $c=0$ 且 $k,m>0$，模型永远振荡；若阻尼为负，反馈可能向系统注入能量。
+
+“临界阻尼最快而不超调”需要限定比较对象：固定 $\omega_n$、标准二阶无零点传递函数、零初值阶跃跟踪，临界阻尼是常用的快速单调选择。任意初始速度、额外零点或饱和都会改变超调，不能据一个 $\zeta$ 就承诺全部运动不越界。
+
+\subsection{把阶跃响应完整算成数字}
+\begin{examplebox}[算例 弹簧刚度相同 阻尼改变超调]
+取 $m=1\,\mathrm{kg}$、$k=100\,\mathrm{N/m}$、$c=4\,\mathrm{N\,s/m}$，初始位置速度都为零，施加 $F_0=1\,\mathrm N$ 恒力。平衡位置 $x_\infty=F_0/k=0.01\,\mathrm m$，$\omega_n=10\,\mathrm{rad/s}$，$\zeta=0.2$，$\omega_d=\sqrt{96}=9.797959\,\mathrm{rad/s}$。解为
+\[
+ x(t)=0.01\left[1-e^{-2t}\left(\cos(\sqrt{96}t)
+ +\frac{2}{\sqrt{96}}\sin(\sqrt{96}t)\right)\right].
+\]
+求导后正弦为零的第一个峰值出现在 $t_p=\pi/\omega_d=0.320637\,\mathrm s$。代回得相对超调
+\[
+ M_p=e^{-\zeta\pi/\sqrt{1-\zeta^2}}=0.526621,
+\]
+所以峰值为 $0.0152662\,\mathrm m$，超过平衡位置约 $5.2662\,\mathrm{mm}$。若改为临界阻尼 $c=2\sqrt{km}=20$，响应变成 $x(t)=0.01[1-(1+10t)e^{-10t}]$。
+\end{examplebox}
+
+\begin{figure}[htbp]
+\centering\includegraphics[width=0.9\linewidth]{figures/mk_second_order.pdf}
+\caption{相同质量和刚度下的归一化阶跃响应。阻尼太小会振荡，过大则产生慢模态。图中的四条曲线由各自完整微分方程计算。}
+\end{figure}
+
+若要求标准欠阻尼二阶阶跃超调不超过 $5\%$，由 $e^{-\zeta\pi/\sqrt{1-\zeta^2}}\le0.05$，取对数并平方得
+\begin{equation}
+ \zeta\ge\frac{-\ln0.05}{\sqrt{\pi^2+(\ln0.05)^2}}
+ \approx0.690107.
+\end{equation}
+本例至少需要 $c=2\zeta\sqrt{km}\approx13.8021\,\mathrm{N\,s/m}$。实际关节还包含采样、力矩环、时延和柔性，故这是模型设计值，不是可以直接搬到真机的保证。
+
+\section{从二阶方程到状态方程}
+令 $x_1=q$、$x_2=\dot q$，则任何给出 $\ddot q=f(q,\dot q,u)$ 的系统都可以写成一阶方程组
+\begin{equation}
+ \frac{d}{dt}\begin{bmatrix}x_1\\x_2\end{bmatrix}
+ =\begin{bmatrix}x_2\\f(x_1,x_2,u)\end{bmatrix}.
+\end{equation}
+状态（state）是预测未来所需的一组当前量。在给定输入及模型时，只知道位置通常不够：同一位置可能静止，也可能高速通过，因此还需要速度。
+
+对于 $J_r\ddot q+b\dot q+kq=\tau$，状态方程为
+\begin{equation}
+ \dot x=Ax+B\tau,\quad
+ A=\begin{bmatrix}0&1\\-k/J_r&-b/J_r\end{bmatrix},\quad
+ B=\begin{bmatrix}0\\1/J_r\end{bmatrix}.
+\end{equation}
+线性系统中的“线性”指状态和输入以一次形式出现，且不互相相乘；并不要求轨迹在时间图上是直线。$\dot x=Ax$ 的解是 $x(t)=e^{At}x(0)$，矩阵指数定义为 $I+At+(At)^2/2!+\cdots$，通常不等于对每个矩阵元素分别取指数。
+
+
+\begin{examplebox}[算例 用矩阵指数精确推进一个双积分模型]
+若输入 $u$ 直接是加速度，$\ddot q=u$，则 $A=\begin{bmatrix}0&1\\0&0\end{bmatrix}$、$B=(0,1)^\mathsf T$。因为 $A^2=0$，矩阵指数级数在一次项后全部为零：
+\[
+ e^{AT_s}=I+AT_s=\begin{bmatrix}1&T_s\\0&1\end{bmatrix}.
+\]
+在一段内输入保持为 $u_k$，输入积分为
+\[
+ B_d=\int_0^{T_s}e^{A\xi}B\,d\xi
+ =\int_0^{T_s}\begin{bmatrix}\xi\\1\end{bmatrix}d\xi
+ =\begin{bmatrix}T_s^2/2\\T_s\end{bmatrix}.
+\]
+因此 $q_{k+1}=q_k+T_s\dot q_k+T_s^2u_k/2$，$\dot q_{k+1}=\dot q_k+T_su_k$。在 $T_s=0.005\,\mathrm s$、静止起步、$u=2\,\mathrm{rad/s^2}$ 时，第一步角度增加 $0.000025\,\mathrm{rad}$，速度增加 $0.01\,\mathrm{rad/s}$。这个结果与匀加速运动公式完全一致，说明矩阵指数只是把熟悉的积分组织成通用形式。
+\end{examplebox}
+
+\subsection{非线性模型在平衡点附近怎样变成线性模型}
+设 $\dot x=f(x,u)$，平衡点满足 $f(x_0,u_0)=0$。用 $\delta x=x-x_0$、$\delta u=u-u_0$ 表示小扰动，一阶展开得到
+\begin{equation}
+ \delta\dot x=A\delta x+B\delta u,
+ \quad A=\left.\frac{\partial f}{\partial x}\right|_{x_0,u_0},
+ \quad B=\left.\frac{\partial f}{\partial u}\right|_{x_0,u_0}.
+\end{equation}
+单摆从竖直向下方向量角时，$\ddot\theta=-(g/l)\sin\theta$。在下垂点 $\theta_0=0$，$\sin\theta\approx\theta$，所以 $A=\begin{bmatrix}0&1\\-g/l&0\end{bmatrix}$。在倒立点 $\theta_0=\pi$，令 $\delta\theta=\theta-\pi$，有 $\sin(\pi+\delta\theta)\approx-\delta\theta$，故加速度变成 $+(g/l)\delta\theta$。只改变工作点，局部稳定性就完全不同。
+
+\section{复数不是额外的物理维度}
+复数 $z=a+jb$ 中 $j^2=-1$。它可写为 $z=re^{j\phi}$，其中 $r=\sqrt{a^2+b^2}$，$\phi=\operatorname{atan2}(b,a)$。欧拉公式
+\begin{equation}
+ e^{j\phi}=\cos\phi+j\sin\phi
+\end{equation}
+把旋转与正弦波联系起来。两个复数相乘，模相乘、相角相加。写成复数通常是计算技巧；实际位置、电压或力仍可取复表达式的实部。
+
+\begin{examplebox}[算例 一阶低通的幅值衰减和相位]
+传递函数 $G(s)=1/(s+1)$，输入角频率为 $1\,\mathrm{rad/s}$ 时，令 $s=j$：
+\[
+ G(j)=\frac1{1+j}=\frac{1-j}{(1+j)(1-j)}=\frac{1-j}{2}.
+\]
+故模为 $\sqrt{(1/2)^2+(-1/2)^2}=1/\sqrt2$，相角为 $-\pi/4$。若输入为 $\cos t$，稳定后的输出为 $0.707107\cos(t-\pi/4)$。分贝幅值为 $20\log_{10}(0.707107)=-3.0103\,\mathrm{dB}$。
+\end{examplebox}
+
+复数根 $s=\sigma+j\omega$ 对应 $e^{st}=e^{\sigma t}(\cos\omega t+j\sin\omega t)$。实部 $\sigma$ 决定增长或衰减，虚部 $\omega$ 决定振荡角频率。$\omega$ 的单位为 rad/s，普通频率 $f=\omega/(2\pi)$ 的单位为 Hz。$10\,\mathrm{rad/s}$ 约为 $1.59155\,\mathrm{Hz}$，不是 $10\,\mathrm{Hz}$。
+
+\section{拉普拉斯变换把导数变成代数}
+对 $t\ge0$ 的信号，单边拉普拉斯变换定义为
+\begin{equation}
+ X(s)=\mathcal L\{x(t)\}=\int_0^\infty x(t)e^{-st}\,dt.
+\end{equation}
+它在积分收敛的 $s$ 范围内成立。不是所有信号在任意 $s$ 上都有相同变换。例如 $x(t)=e^{-at}$ 时，积分为 $1/(s+a)$，要求 $\operatorname{Re}(s+a)>0$。
+
+对导数做分部积分：
+\begin{align}
+ \mathcal L\{\dot x\}
+ &=\left[x(t)e^{-st}\right]_0^\infty
+   +s\int_0^\infty x(t)e^{-st}\,dt\\
+ &=sX(s)-x(0),
+\end{align}
+其中无穷远边界项为零需要相应收敛条件。再应用一次得 $\mathcal L\{\ddot x\}=s^2X-sx(0)-\dot x(0)$。初值没有消失，而是变成代数项。
+
+\begin{examplebox}[算例 用拉普拉斯逐步解一个微分方程]
+求 $\dot y+2y=u$、$y(0)=0$ 在单位阶跃 $u(t)=1$ 下的响应。因 $\mathcal L\{1\}=1/s$，有
+\[
+ (s+2)Y(s)=1/s,\qquad
+ Y(s)=\frac1{s(s+2)}.
+\]
+设 $Y=A/s+B/(s+2)$，两边乘 $s(s+2)$ 得 $1=A(s+2)+Bs$。比较常数和 $s$ 的系数，$2A=1$、$A+B=0$，所以 $A=1/2$、$B=-1/2$。逆变换得到
+\[
+ y(t)=\tfrac12(1-e^{-2t}).
+\]
+代入原方程验算：$\dot y=e^{-2t}$，$2y=1-e^{-2t}$，相加恰为 1；初值也为零。
+\end{examplebox}
+
+传递函数（transfer function）定义为零初值下输出与输入变换之比 $G(s)=Y(s)/U(s)$。上例为 $1/(s+2)$。分母的根称为极点（pole），分子的根称为零点（zero）。约分后传递函数只反映从指定输入到指定输出可见的动态；被消去或不可观的内部模态不能因此判定安全。现代控制章节会用可控性和可观性进一步说明。
+
+终值定理给出 $\lim_{t\to\infty}y(t)=\lim_{s\to0}sY(s)$，需要 $sY(s)$ 的全部极点位于严格左半平面等相应条件。本例得 $1/2$。若 $y(t)=\sin t$，形式上 $\lim_{s\to0}s/(s^2+1)=0$，但时域根本没有终值；虚轴极点让定理条件不成立。
+
+复变函数中的留数，是局部简单极点项 $c/(s-p)$ 的系数 $c$；部分分式就可看成用留数组织逆变换。辐角原理把闭曲线内的零点数与极点数联系起来，是后续 Nyquist 稳定判据的数学基础。初学阶段先能实际分解上面的有理函数，再理解这些抽象词会更稳固。
+
+\section{傅里叶级数和频谱解释信号由什么组成}
+\subsection{有限傅里叶级数可以直接求速度和加速度}
+周期为 $T_0$、基角频率 $\omega_0=2\pi/T_0$ 的信号，可在相应收敛条件下展开为
+\begin{equation}
+ q(t)=a_0+\sum_{k=1}^{K}
+ \left[a_k\cos(k\omega_0t)+b_k\sin(k\omega_0t)\right]
+\end{equation}
+的有限近似。$k$ 是谐波编号，$K$ 是最高谐波阶数；“七阶傅里叶”通常表示到第七个谐波，不是把 $t$ 提到七次方。常数项和系数可由正交性求出，例如
+\begin{equation}
+ a_0=\frac1{T_0}\int_0^{T_0}q(t)dt,\quad
+ a_k=\frac2{T_0}\int_0^{T_0}q(t)\cos(k\omega_0t)dt.
+\end{equation}
+正交性指不同整周期正弦余弦的乘积积分为零；同频正弦或余弦平方的积分为 $T_0/2$。这让每个系数可以单独“提取”出来。
+
+\begin{examplebox}[算例 两个谐波的速度和加速度]
+令 $q(t)=0.1\sin(2\pi t)+0.02\sin(6\pi t)$，单位 rad。两个频率分别为 1 Hz 和 3 Hz。求导得
+\[
+ \dot q=0.2\pi\cos(2\pi t)+0.12\pi\cos(6\pi t),
+\]
+\[
+ \ddot q=-0.4\pi^2\sin(2\pi t)-0.72\pi^2\sin(6\pi t).
+\]
+在 $t=0$，速度为 $0.32\pi=1.00531\,\mathrm{rad/s}$，加速度为零。3 Hz 的位置幅值只有 1 Hz 的五分之一，速度幅值却是它的 $3/5$，加速度幅值是它的 $9/5$。高频项对力矩的影响可能很大，不能只看位置曲线是否平滑。
+\end{examplebox}
+
+\begin{figure}[htbp]
+\centering\includegraphics[width=0.9\linewidth]{figures/mk_fourier.pdf}
+\caption{同一有限傅里叶轨迹的位置、速度和加速度。每次求导都会把第 $k$ 个谐波额外乘 $k\omega_0$，因此较小的高频位置分量也可能主导加速度。}
+\end{figure}
+
+有限谐波并不自动保证“不会激发共振”：若某个谐波、驱动非线性产生的高次频率或过渡段频率接近柔性模态，仍会激振。辨识激励必须同时限制位置、速度、加速度、力矩和频率，并处理进入、退出周期轨迹的过渡段。
+
+\subsection{采样频谱的几个精确边界}
+对 $N$ 个采样值 $x_n$，离散傅里叶变换（DFT）定义为
+\begin{equation}
+ X_k=\sum_{n=0}^{N-1}x_n e^{-j2\pi kn/N}.
+\end{equation}
+快速傅里叶变换（FFT）是计算同一组 $X_k$ 的高效算法，不是另一种物理变换。采样率为 $f_s$ 时，第 $k$ 个频点为 $f_k=kf_s/N$，频点间隔 $\Delta f=f_s/N$。$f_s=200\,\mathrm{Hz}$、记录 $10\,\mathrm s$，则 $N=2000$、间隔为 $0.1\,\mathrm{Hz}$。实际分辨两个频率的能力还受窗函数、噪声和幅值差影响，不能只靠频点间隔判断。
+
+混叠（aliasing）是不同连续频率给出相同离散样本的现象。例如 $f_s=200\,\mathrm{Hz}$ 时，$120\,\mathrm{Hz}$ 正弦在采样点满足
+\begin{equation}
+ \sin(2\pi120n/200)=-\sin(2\pi80n/200).
+\end{equation}
+只看样本会误认为是带相位变化的 80 Hz 信号。防混叠必须在采样之前限制高频，事后低通不能唯一恢复已经混进来的成分。对于理想带限信号，采样率严格高于最高频率两倍是重建条件；控制采样率往往还要远高于期望闭环带宽以容纳相位损失。
+
+不是整数周期的截断会产生谱泄漏（leakage）。加窗减少远处泄漏，但会加宽主峰、改变幅值标度；零填充让频谱曲线看起来更密，不增加原始记录的独立信息。用频谱分析实验时，应同时记录采样率、时长、窗函数及幅值归一化方式。
+
+\section{离散时间和 z 变换}
+计算机每隔 $T_s$ 处理一次，连续方程变成差分方程。单边 z 变换定义为
+\begin{equation}
+ X(z)=\sum_{k=0}^{\infty}x_kz^{-k}.
+\end{equation}
+在适当初始条件下，$z^{-1}$ 对应一个采样周期的延迟。若 $x_k=a^k$，由等比级数求和得 $X(z)=1/(1-az^{-1})=z/(z-a)$，收敛域是 $|z|>|a|$。连续模态 $e^{st}$ 在 $t=kT_s$ 被采样后变成 $(e^{sT_s})^k$，因此模态映射为 $z=e^{sT_s}$。连续左半平面映射到离散单位圆内。
+
+\begin{examplebox}[算例 把连续一阶模型精确离散一次]
+已知 $\dot y=-2y+u$，在每个采样区间把 $u=u_k$ 保持不变，称为零阶保持。由一阶方程解：
+\[
+ y_{k+1}=e^{-2T_s}y_k+\frac{1-e^{-2T_s}}2u_k.
+\]
+取 $T_s=0.005\,\mathrm s$，系数为 $a=0.99004983$、$b=0.004975083$。若 $y_0=0$，$u_0=1$，第一步 $y_1=b$。若错误地省略输入项中的 $T_s$ 尺度，系统增益会完全改变。
+零初值下 $Y(z)/U(z)=b/(z-a)$。离散极点 $a<1$，故稳定；恒输入的稳态值为 $b/(1-a)=1/2$，与连续模型一致。
+\end{examplebox}
+
+对简单滤波程序 $y_k=0.9y_{k-1}+0.1u_k$，其传递函数是 $0.1/(1-0.9z^{-1})$。由 $0.9=e^{-aT_s}$ 可对应一个连续衰减率 $a=-\ln0.9/T_s$。在 $T_s=1\,\mathrm{ms}$ 时，$a=105.361\,\mathrm{s^{-1}}$。$a/(2\pi)$ 是等效连续极点频率；它不是无需说明即可当作该离散滤波器精确 $-3\,\mathrm{dB}$ 频率的定义。
+
+\section{积分器为何会凭空增能量}
+\subsection{显式欧拉}
+显式欧拉（forward Euler）使用当前斜率：$x_{k+1}=x_k+h f(x_k)$。对 $\dot x=-ax$，递推因子为 $1-ah$，要衰减需要 $|1-ah|<1$，即 $0<ah<2$。连续系统即使稳定，过大的数值步长也会把它算成发散。
+
+更直接的例子是无阻尼振子 $\dot x=v$、$\dot v=-\omega^2x$。显式欧拉给出
+\[
+ x_{k+1}=x_k+hv_k,\qquad v_{k+1}=v_k-h\omega^2x_k.
+\]
+定义单位质量能量 $E_k=\frac12(v_k^2+\omega^2x_k^2)$。展开两项平方，交叉项互相抵消，得到
+\begin{equation}
+ E_{k+1}=(1+h^2\omega^2)E_k.
+\end{equation}
+任何非零步长都会逐步增能。这是算法误差，不是控制器真的注入了力。
+
+\subsection{半隐式 隐式和高阶方法}
+半隐式欧拉先更新速度，再用新速度更新位置：$v_{k+1}=v_k-h\omega^2x_k$，$x_{k+1}=x_k+hv_{k+1}$。对于这个线性振子且 $0<h\omega<2$，能量在有界范围内振荡；它不严格保持原能量，更不意味着任意步长都稳定。后向欧拉用下一步斜率，需要解联立方程，常对快速稳定模态更稳，但可能带来额外数值耗散。
+
+四阶 Runge--Kutta（RK4）在一步内计算四次斜率；对于足够光滑的方程，它的全局误差通常随 $h^4$ 缩小。碰撞、摩擦切换、刚性接触会破坏简单的光滑误差假设。仿真时间步、控制周期和传感采样周期是三个不同量，应分别注明。
+
+\begin{figure}[htbp]
+\centering\includegraphics[width=0.9\linewidth]{figures/mk_integrators.pdf}
+\caption{无阻尼振子的数值积分比较。显式欧拉能量增长，后向欧拉能量衰减，半隐式欧拉在本例步长下有界振荡；解析解能量严格不变。}
+\end{figure}
+
+
+\subsection{四阶 Runge--Kutta 的四次斜率具体怎么算}
+对于 $\dot x=f(t,x)$，RK4 使用
+\begin{align}
+ k_1&=f(t_k,x_k),\\
+ k_2&=f(t_k+h/2,x_k+hk_1/2),\\
+ k_3&=f(t_k+h/2,x_k+hk_2/2),\\
+ k_4&=f(t_k+h,x_k+hk_3),\\
+ x_{k+1}&=x_k+\frac h6(k_1+2k_2+2k_3+k_4).
+\end{align}
+四个 $k_i$ 都是变化率，不是已经乘过步长的状态增量；不同教材可能把 $h$ 吸收入 $k_i$，实现时必须选定一种。
+例如 $\dot x=-2x$、$x_0=1$、$h=0.1$，依次得 $k_1=-2$、$k_2=-1.8$、$k_3=-1.82$、$k_4=-1.636$。于是 $x_1=1+(0.1/6)(-2-3.6-3.64-1.636)=0.818733333$。解析值 $e^{-0.2}=0.818730753$，误差约 $2.58\times10^{-6}$；显式欧拉仅得到 0.8。更精细的积分提高了对这个光滑模型的数值准确度，但模型参数错误、时延或真实接触未建模的问题仍然存在。
+
+\section{变分法从最好的数走向最好的曲线}
+\subsection{把求导的对象换成整条函数}
+普通优化找参数 $a$ 使 $E(a)$ 最小；变分法（calculus of variations）寻找整条函数 $q(t)$，使
+\begin{equation}
+ \mathcal J[q]=\int_0^T L(t,q,\dot q)\,dt
+\end{equation}
+最小或满足驻值条件。这样的“输入函数、输出数值”的对象称为泛函（functional）。$L$ 在这里是积分中的代价密度；动力学中的拉格朗日函数也用 $L$，具体含义随问题给出。
+
+给候选曲线一个小扰动 $q_\epsilon=q+\epsilon\eta$，其中 $\eta(0)=\eta(T)=0$ 保持端点位置不变。若 $q$ 是驻值，$d\mathcal J[q_\epsilon]/d\epsilon$ 在 $\epsilon=0$ 时为零：
+\begin{align}
+ 0&=\int_0^T\left(\frac{\partial L}{\partial q}\eta
+       +\frac{\partial L}{\partial\dot q}\dot\eta\right)dt\\
+ &=\left[\frac{\partial L}{\partial\dot q}\eta\right]_0^T
+  +\int_0^T\left[\frac{\partial L}{\partial q}
+  -\frac d{dt}\left(\frac{\partial L}{\partial\dot q}\right)\right]\eta\,dt.
+\end{align}
+边界项为零，又因为内部扰动函数 $\eta$ 可以任取，方括号必须为零，得到欧拉--拉格朗日方程
+\begin{equation}
+ \frac d{dt}\frac{\partial L}{\partial\dot q}
+ -\frac{\partial L}{\partial q}=0.
+\end{equation}
+它首先是必要的驻值条件，不能在所有问题中直接把每个解都称为全局最小值。
+
+\subsection{最小加加速度为何得到五次多项式}
+令代价 $\mathcal J[q]=\int_0^T(\dddot q)^2dt$，并固定起止位置、速度、加速度。此时允许扰动 $\eta,\dot\eta,\ddot\eta$ 在两端都为零。求一阶变分并连续分部积分三次：
+\begin{equation}
+ \delta\mathcal J=2\int_0^T\dddot q\,\dddot\eta\,dt
+ =-2\int_0^T q^{(6)}\eta\,dt=0.
+\end{equation}
+因此 $q^{(6)}=0$，即 $q$ 至多为五次多项式。令起点为 0、终点为 1、时间归一化 $s=t/T$，且两端速度加速度均为零，则
+\begin{equation}
+ q(s)=a_3s^3+a_4s^4+a_5s^5.
+\end{equation}
+终点的三个条件给出 $a_3+a_4+a_5=1$、$3a_3+4a_4+5a_5=0$、$6a_3+12a_4+20a_5=0$。后两式消元得 $a_4=-15$、$a_5=6$、$a_3=10$，所以 $q=10s^3-15s^4+6s^5$。因为任何满足齐次边界条件的扰动都有
+\[
+ \mathcal J[q+\eta]-\mathcal J[q]
+ =\int_0^T(\dddot\eta)^2dt\ge0,
+\]
+且交叉项因 $q^{(6)}=0$ 与边界条件消失，本例确实是最小值，而不只是驻值。
+
+这并未自动加入最大速度、最大力矩、避障等约束；加入它们后，最优轨迹一般需要分段表达或数值优化。后续规划章节将把这一数学结果与实际运动约束连接起来。
+
+\section{计算练习与逐步解答}
+\subsection*{题目}
+\begin{enumerate}
+\item $q(t)=0.1+0.4t-0.05t^2$，求 $t=2\,\mathrm s$ 的位置、速度和加速度，以及从 0 到 2 s 的角度变化。
+\item 求 $\dot y+4y=8$、$y(0)=1$ 的解、时间常数和 $t=0.5\,\mathrm s$ 的值。
+\item $m=2\,\mathrm{kg}$、$k=200\,\mathrm{N/m}$。求临界阻尼，并在 $c=8$ 时求阻尼比、极点和振荡频率。
+\item 对 $\dot x=-10x$ 用显式欧拉。求 $h=0.05,0.15,0.25\,\mathrm s$ 的递推因子，判断结果；再用精确离散化求 $h=0.25$ 时的因子。
+\end{enumerate}
+\subsection*{解答}
+\begin{enumerate}
+\item $\dot q=0.4-0.1t$，$\ddot q=-0.1$。在 $t=2$ 时，$q=0.1+0.8-0.2=0.7\,\mathrm{rad}$、$\dot q=0.2\,\mathrm{rad/s}$、$\ddot q=-0.1\,\mathrm{rad/s^2}$。角度变化为 $0.7-0.1=0.6\,\mathrm{rad}$，也等于 $\int_0^2(0.4-0.1t)dt$。
+\item 平衡值为 $8/4=2$，齐次解为 $Ce^{-4t}$，故 $y=2+Ce^{-4t}$。由 $y(0)=1$ 得 $C=-1$，所以 $y=2-e^{-4t}$。时间常数为 $1/4=0.25\,\mathrm s$；$y(0.5)=2-e^{-2}=1.864665$。
+\item $\omega_n=\sqrt{200/2}=10\,\mathrm{rad/s}$；$c_{\rm crit}=2\sqrt{mk}=40\,\mathrm{N\,s/m}$。$c=8$ 时 $\zeta=8/40=0.2$，极点为 $-2\pm j\sqrt{96}$，振荡角频率为 $9.797959\,\mathrm{rad/s}$，频率为 $9.797959/(2\pi)=1.55939\,\mathrm{Hz}$。
+\item 递推因子 $a_E=1-10h$ 分别为 $0.5,-0.5,-1.5$。前者单调衰减，中者交替变号衰减，后者交替发散。精确离散因子为 $e^{-10\times0.25}=e^{-2.5}=0.082085$，仍稳定。发散来自积分算法，不来自原连续模型。
+\end{enumerate}
+
+\section*{本章与原稿的对应}
+本章整合 [A，第3--5页] 与 [B，第17--24页]，补充了链式法则、差分噪声、初值和收敛条件、积分器能量推导、变分法边界项。拉普拉斯是积分变换，拉格朗日是能量建模与变分框架中的名称，两者不能混用。

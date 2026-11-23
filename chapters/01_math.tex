@@ -1,0 +1,344 @@
+\chapter{从数与单位到矩阵和最小二乘}\label{ch:math}
+\section{先知道每一个数描述什么}
+机械臂程序里，一列七个数可能是角度，也可能是电流、力矩或编码器计数。它们在内存中都是浮点数，物理意义却完全不同。本章从能够实际计算的最小单元开始：先把数的含义、单位和形状说清楚，再学习矩阵为什么能够描述运动、误差与辨识。
+
+\subsection{标量 向量 矩阵及其维度}
+标量（scalar）是一个数，例如一根连杆的长度 $l=0.5\,\mathrm m$。向量（vector）把一组有顺序的数排成一列，例如两关节位置
+\begin{equation}
+ q=\begin{bmatrix}q_1\\q_2\end{bmatrix}
+ =\begin{bmatrix}0\\\pi/2\end{bmatrix}\mathrm{rad}\in\mathbb R^2.
+\end{equation}
+$\mathbb R^2$ 读作“二维实数空间”，意思是有两个实数分量。这里的下标是关节编号。向量不是无序的数袋：交换两个分量，会变成另一种机械臂姿态。矩阵（matrix）是一张有行和列的数表。$A\in\mathbb R^{m\times n}$ 表示 $m$ 行、$n$ 列；它把一个 $n$ 维输入变为 $m$ 维输出。
+
+“维度”有两种常见意思，必须分开。数组维度描述有几个分量；物理量纲描述长度、时间、质量怎样组合。例如三维位置 $p$ 的数组维度为 3，三个分量的单位都为米。三维角速度 $\omega$ 也有 3 个分量，但单位为弧度每秒。两者不能因为形状相同就相加。
+
+弧度（radian，rad）定义为弧长除以半径。整圆的弧长为 $2\pi r$，故 $360^\circ=2\pi\,\mathrm{rad}$。数学上弧度可视为无量纲，工程记录里仍应保留 rad，以防与度混淆。
+\begin{examplebox}[算例 角度速度和力矩单位]
+$30^\circ=30\pi/180=\pi/6\approx0.523599\,\mathrm{rad}$。若关节在 $0.2\,\mathrm s$ 内增加 $3^\circ$，平均速度是
+\[
+ \bar\omega=\frac{3\pi/180}{0.2}=0.261799\,\mathrm{rad/s}.
+\]
+长度 $0.5\,\mathrm m$ 的杆端受到与杆垂直的 $4\,\mathrm N$ 力，力矩为 $\tau=lF=2\,\mathrm{N\,m}$。如果把 $0.5\,\mathrm m$ 误写成数值 500，再继续按米计算，结果会错误地放大一千倍。单位错误不会自动引发程序异常。
+\end{examplebox}
+
+\subsection{等号 近似号 变化量和导数}
+$=$ 表示在给定假设下严格相等，$\approx$ 表示近似。$\Delta q$ 常表示一次有限变化，$\delta q$ 常表示用于线性化的小变化；两者不是新的物理量。$\dot q=dq/dt$ 是角速度，$\ddot q=d^2q/dt^2$ 是角加速度。上标 $\mathsf T$ 表示转置，不是时间；$q^\mathsf T$ 把列向量改成行向量。上标 $-1$ 表示逆运算，只有在相应逆存在时才可以写。
+
+\section{矩阵乘法是一组加权求和}
+设
+\begin{equation}
+ A=\begin{bmatrix}2&1\\-1&3\end{bmatrix},\qquad
+ x=\begin{bmatrix}4\\2\end{bmatrix}.
+\end{equation}
+矩阵乘向量是每一行分别与向量做乘积再求和：
+\begin{equation}
+ Ax=\begin{bmatrix}2\cdot4+1\cdot2\\-1\cdot4+3\cdot2\end{bmatrix}
+ =\begin{bmatrix}10\\2\end{bmatrix}.
+\end{equation}
+它还可解释为“按输入系数组合矩阵的各列”：$Ax=4(2,-1)^\mathsf T+2(1,3)^\mathsf T$。这个看法随后会解释为什么某些末端方向无法到达，以及为什么辨识数据不足时无法区分某些参数。
+
+矩阵乘法 $AB$ 的规则相同：$A$ 的每一行分别与 $B$ 的每一列相乘再求和。若 $A$ 为 $m\times n$，$B$ 必须有 $n$ 行。结果为 $m\times p$，其中 $p$ 是 $B$ 的列数。检查维度是检查公式的第一步。
+\begin{examplebox}[算例 为什么矩阵的先后顺序不能交换]
+取
+\[
+ A=\begin{bmatrix}1&1\\0&1\end{bmatrix},\quad
+ B=\begin{bmatrix}2&0\\0&1\end{bmatrix}.
+\]
+直接计算得到
+\[
+ AB=\begin{bmatrix}2&1\\0&1\end{bmatrix},\qquad
+ BA=\begin{bmatrix}2&2\\0&1\end{bmatrix}.
+\]
+对 $x=(0,1)^\mathsf T$，$ABx=(1,1)^\mathsf T$，而 $BAx=(2,1)^\mathsf T$。$B$ 先沿水平方向拉伸，$A$ 再把高度加入水平坐标，与先做后一步再拉伸不同。三维旋转的不可交换性也是这个道理。
+\end{examplebox}
+
+单位矩阵 $I$ 的对角元素为 1，其余为 0，满足 $Ix=x$。转置满足
+\begin{equation}
+ (AB)^\mathsf T=B^\mathsf TA^\mathsf T.
+\end{equation}
+顺序倒过来，可以从第 $i,j$ 元素验证：$[(AB)^\mathsf T]_{ij}=\sum_k A_{jk}B_{ki}$，恰好等于 $[B^\mathsf TA^\mathsf T]_{ij}$。这个顺序规则在后面的功率推导和最小二乘求导中会反复使用。
+
+\section{长度 夹角和加权误差}
+向量内积 $x^\mathsf Ty=\sum_i x_i y_i$ 是一个数。欧氏范数（Euclidean norm）也叫二范数：
+\begin{equation}
+ \|x\|_2=\sqrt{x^\mathsf Tx}=\sqrt{\sum_i x_i^2}.
+\end{equation}
+例如位置误差 $e_p=(0.003,-0.004,0)^\mathsf T\,\mathrm m$ 的长度为 $0.005\,\mathrm m$，即 $5\,\mathrm{mm}$。两向量夹角 $\gamma$ 满足 $x^\mathsf Ty=\|x\|\|y\|\cos\gamma$；内积为零称为正交（orthogonal），二维、三维中就是垂直。
+
+当误差同时包含米和弧度时，直接计算 $\sqrt{e_x^2+e_y^2+e_z^2+e_{rx}^2+e_{ry}^2+e_{rz}^2}$ 会把两种单位混在一起。必须先声明尺度。例如允许位置误差 $p_s=0.01\,\mathrm m$、角度误差 $\theta_s=0.05\,\mathrm{rad}$，定义无量纲误差
+\begin{equation}
+ \tilde e=\begin{bmatrix}e_p/p_s\\e_R/\theta_s\end{bmatrix},\qquad
+ \|\tilde e\|_2^2=e_p^\mathsf T p_s^{-2}I e_p+e_R^\mathsf T\theta_s^{-2}I e_R.
+\end{equation}
+若只有 $e_x=0.005\,\mathrm m$ 和 $e_{rz}=0.025\,\mathrm{rad}$，两者各占允许尺度的一半，故 $\|\tilde e\|=\sqrt{0.5^2+0.5^2}=0.7071$。这种缩放没有改变实际误差，却明确了“哪种误差更重要”。后面的 IK 权重、辨识条件数、控制代价都要面对相同问题。
+
+\section{线性方程 逆矩阵 秩与零空间}
+\subsection{从两个方程理解逆矩阵}
+考虑 $Ax=b$，其中
+\begin{equation}
+ \begin{bmatrix}2&1\\1&3\end{bmatrix}
+ \begin{bmatrix}x_1\\x_2\end{bmatrix}
+ =\begin{bmatrix}5\\5\end{bmatrix}.
+\end{equation}
+第一行是 $2x_1+x_2=5$，第二行是 $x_1+3x_2=5$。从第一行得 $x_2=5-2x_1$，代入第二行得 $x_1+15-6x_1=5$，故 $x_1=2$，$x_2=1$。
+
+对 $A=\begin{bmatrix}a&b\\c&d\end{bmatrix}$，行列式（determinant）是 $ad-bc$。若它不为零，则
+\begin{equation}
+ A^{-1}=\frac{1}{ad-bc}\begin{bmatrix}d&-b\\-c&a\end{bmatrix}.
+\end{equation}
+上例 $\det A=5$，所以 $A^{-1}=\frac15\begin{bmatrix}3&-1\\-1&2\end{bmatrix}$，乘以 $b$ 同样得到 $(2,1)^\mathsf T$。实际程序需要的是解 $Ax=b$，通常直接调用线性求解器，不必先显式构造 $A^{-1}$。
+
+\subsection{秩描述独立信息有几份}
+矩阵的列空间（column space）是各列线性组合能产生的所有输出；秩（rank）是其中独立方向的个数。若
+\begin{equation}
+ A=\begin{bmatrix}1&2\\2&4\end{bmatrix},
+\end{equation}
+第二列是第一列的两倍，因此两个输入只有一个独立的输出方向，秩为 1。$b=(3,6)^\mathsf T$ 可由 $x=(3,0)^\mathsf T$、$(1,1)^\mathsf T$ 等无穷多组输入生成；$b=(3,7)^\mathsf T$ 则不在列空间中，无论如何都无法精确生成。
+
+零空间（null space）是所有被 $A$ 映射为零的输入：
+\begin{equation}
+ \mathcal N(A)=\{x:Ax=0\}.
+\end{equation}
+上例 $A(-2,1)^\mathsf T=0$。只要在任一解上加 $\alpha(-2,1)^\mathsf T$，输出就不变。对 $m\times n$ 矩阵，秩与零空间维数满足
+\begin{equation}
+ \operatorname{rank}(A)+\dim\mathcal N(A)=n.
+\end{equation}
+七轴机械臂在六维任务雅可比行满秩时，$n=7$、秩为 6，于是速度零空间是一维。这里有条件：任务减少为三维位置时，零空间通常为四维；任务雅可比奇异时也会改变。不能把“七轴只有一个零空间方向”当成任何情形都成立的规则。
+
+\section{特征值说明反复作用会怎样}
+如果非零向量 $v$ 满足 $Av=\lambda v$，它就是 $A$ 的特征向量（eigenvector），$\lambda$ 是相应特征值（eigenvalue）。沿这个方向输入，输出仍在同一直线上，只改变长度或正负方向。求特征值就是让
+\begin{equation}
+ (A-\lambda I)v=0
+\end{equation}
+有非零解，因而必须有 $\det(A-\lambda I)=0$。
+\begin{examplebox}[算例 手算两个特征值和两个特征方向]
+取 $A=\begin{bmatrix}2&1\\1&2\end{bmatrix}$，则
+\[
+ \det(A-\lambda I)=(2-\lambda)^2-1
+ =\lambda^2-4\lambda+3=(\lambda-3)(\lambda-1).
+\]
+所以 $\lambda_1=3$、$\lambda_2=1$。代回方程，得到单位特征向量
+\[
+ v_1=\frac{1}{\sqrt2}\begin{bmatrix}1\\1\end{bmatrix},\qquad
+ v_2=\frac{1}{\sqrt2}\begin{bmatrix}-1\\1\end{bmatrix}.
+\]
+输入 $x=(1,0)^\mathsf T=(v_1-v_2)/\sqrt2$，输出为 $(3v_1-v_2)/\sqrt2=(2,1)^\mathsf T$。反复作用 $k$ 次时，第一个分量被乘 $3^k$，第二个仍乘 1。这就是用特征值判断离散系统会放大还是衰减的来源。
+\end{examplebox}
+
+若矩阵有一组线性独立的特征向量，可写 $A=V\Lambda V^{-1}$，于是 $A^k=V\Lambda^kV^{-1}$。并非所有方阵都能这样对角化。例如 $\begin{bmatrix}1&1\\0&1\end{bmatrix}$ 只有一个独立特征向量。一般情形可用 Jordan 结构或直接矩阵指数；本书不把“任何矩阵都能拆成独立特征方向”作为前提。
+
+对实对称矩阵，总可以选择一组相互正交的实特征向量。若其全部特征值为正，就称为对称正定（symmetric positive definite，SPD），等价于
+\begin{equation}
+ x^\mathsf TAx>0\quad\text{对每一个非零 }x.
+\end{equation}
+例如上例 $x^\mathsf TAx=2x_1^2+2x_1x_2+2x_2^2=(x_1+x_2)^2+x_1^2+x_2^2>0$。把它乘 $1/2$ 可得到类似弹簧势能的二次型。允许等于零则称半正定（positive semidefinite）。对称 $2\times2$ 矩阵 $\begin{bmatrix}a&b\\b&d\end{bmatrix}$ 正定的便捷判据是 $a>0$ 且 $ad-b^2>0$。
+
+\begin{figure}[htbp]
+\centering\includegraphics[width=0.88\linewidth]{figures/mk_eigen_energy.pdf}
+\caption{左图中两条特征方向经过矩阵后不转向，长度分别乘 3 和 1。右图是二次型等高线；同样的数值沿不同方向达到时，向量长度不同。}
+\end{figure}
+
+\section{奇异值分解把任意线性映射分成三步}
+奇异值分解（singular value decomposition，SVD）为
+\begin{equation}
+ A=U\Sigma V^\mathsf T.
+\end{equation}
+$V^\mathsf T$ 把输入换到一组相互正交的坐标；$\Sigma$ 沿各坐标方向拉伸；$U$ 再把结果转到输出坐标。正交矩阵可能包含反射，因此这里的“换坐标”比笼统称作“旋转”更准确。$\Sigma$ 的非负对角元素为奇异值，按 $\sigma_1\ge\sigma_2\ge\cdots\ge0$ 排列。SVD 适用于长方形矩阵，也不要求存在完整的特征向量组。
+
+\begin{examplebox}[算例 从两连杆雅可比手算奇异值]
+取本书贯穿的两连杆在 $q=(0,\pi/2)^\mathsf T$ 时的位置雅可比
+\[
+ J=\begin{bmatrix}-0.5&-0.5\\0.5&0\end{bmatrix}.
+\]
+先计算
+\[
+ J^\mathsf TJ=\begin{bmatrix}0.5&0.25\\0.25&0.25\end{bmatrix}.
+\]
+其特征方程为 $\lambda^2-0.75\lambda+0.0625=0$，根为 $0.654508$ 和 $0.095492$。奇异值是这些根的平方根，故 $\sigma_1=0.809017$、$\sigma_2=0.309017$。可选
+\[
+ v_1=\begin{bmatrix}0.850651\\0.525731\end{bmatrix},\quad
+ v_2=\begin{bmatrix}0.525731\\-0.850651\end{bmatrix},
+\]
+再由 $u_i=Jv_i/\sigma_i$ 得
+\[
+ u_1=\begin{bmatrix}-0.850651\\0.525731\end{bmatrix},\quad
+ u_2=\begin{bmatrix}0.525731\\0.850651\end{bmatrix}.
+\]
+输入速度长度为 $1\,\mathrm{rad/s}$ 时，输出速度在方向 $u_1$ 上最大可达 $0.809017\,\mathrm{m/s}$，在方向 $u_2$ 上最大为 $0.309017\,\mathrm{m/s}$。这两个值描述当前姿态下的几何换算，不是电机真实速度上限。
+\end{examplebox}
+
+\begin{figure}[htbp]
+\centering\includegraphics[width=0.9\linewidth]{figures/mk_svd.pdf}
+\caption{单位关节速度圆经过雅可比变成末端速度椭圆。椭圆主轴方向由 $U$ 给出，半轴长度为奇异值。所有曲线均由同一个数值矩阵计算。}
+\end{figure}
+
+由 $A^\mathsf TA=V\Sigma^\mathsf T\Sigma V^\mathsf T$ 可知，奇异值的平方是 $A^\mathsf TA$ 的特征值。手算可用这条关系理解概念，但数值程序应直接求 SVD，避免先构造 $A^\mathsf TA$ 增加病态程度。对称正定矩阵的奇异值等于特征值；对称不定矩阵的奇异值等于特征值绝对值。例如 $\operatorname{diag}(2,-1)$ 的特征值是 2 和 $-1$，奇异值却是 2 和 1。
+
+\section{条件数是误差敏感程度 不是统一的及格线}
+对可逆方阵，二范数条件数为
+\begin{equation}
+ \kappa_2(A)=\|A\|_2\|A^{-1}\|_2=\frac{\sigma_{\max}}{\sigma_{\min}}.
+\end{equation}
+当 $A$ 固定，仅右端从 $b$ 变成 $b+\delta b$，解相应变成 $x+\delta x$ 时，$A\delta x=\delta b$。于是
+\[
+ \|\delta x\|\le\|A^{-1}\|\,\|\delta b\|,
+ \qquad \|b\|=\|Ax\|\le\|A\|\,\|x\|.
+\]
+将二者相乘整理得到
+\begin{equation}
+ \frac{\|\delta x\|}{\|x\|}
+ \le\kappa_2(A)\frac{\|\delta b\|}{\|b\|}.
+\end{equation}
+这是上界，实际误差可能小得多。矩阵本身也有误差、或者问题是带残差的最小二乘时，误差界还需额外条件，不能直接套用这个最简单版本。
+\begin{examplebox}[算例 数据只变一点 解却变很多]
+令
+\[
+ A=\begin{bmatrix}1&1\\1&1.01\end{bmatrix},\qquad b=\begin{bmatrix}2\\2.01\end{bmatrix}.
+\]
+原方程相减得到 $0.01x_2=0.01$，故 $x=(1,1)^\mathsf T$。仅把第二个测量改为 2.02，相减变成 $0.01x_2=0.02$，于是 $x=(0,2)^\mathsf T$。
+其条件数约为 $402.008$。测量的相对二范数变化为 $0.01/\sqrt{2^2+2.01^2}\approx0.3527\%$，解的相对二范数变化却为 $\sqrt{(-1)^2+1^2}/\sqrt{1^2+1^2}=100\%$，没有违反约 $141.8\%$ 的上界。
+\end{examplebox}
+
+改变单位会改变矩阵列或行的尺度，因此会改变条件数以及最小奇异值。把米改成毫米，原始几何雅可比的线速度行就放大一千倍。对位置与姿态混合的雅可比，应先指定特征长度或权重；对参数辨识矩阵，应同时说明噪声白化方式、参数尺度和基参数选取。条件数 40 只在这些口径固定后才有比较意义。
+
+\section{最小二乘为何是一个投影}
+\subsection{有噪声时无法同时满足每一个方程}
+测量三组数据 $(t,y)=(1,1),(2,2),(3,2)$，希望用直线 $y=at+b$ 描述。三条方程而只有两个未知数，通常没有精确解。写成
+\begin{equation}
+ H\beta\approx y,\qquad
+ H=\begin{bmatrix}1&1\\2&1\\3&1\end{bmatrix},\quad
+ \beta=\begin{bmatrix}a\\b\end{bmatrix},\quad
+ y=\begin{bmatrix}1\\2\\2\end{bmatrix}.
+\end{equation}
+残差（residual）$r=y-H\beta$ 是测量减模型。最小二乘（least squares）找使残差平方和最小的参数：
+\begin{equation}
+ E(\beta)=r^\mathsf Tr=(y-H\beta)^\mathsf T(y-H\beta).
+\end{equation}
+展开为 $y^\mathsf Ty-2\beta^\mathsf TH^\mathsf Ty+\beta^\mathsf TH^\mathsf TH\beta$。对每个参数求偏导后合成梯度：
+\begin{equation}
+ \nabla_\beta E=-2H^\mathsf Ty+2H^\mathsf TH\beta.
+\end{equation}
+令梯度为零便得正规方程（normal equations）$H^\mathsf TH\hat\beta=H^\mathsf Ty$。若 $H$ 列满秩，解唯一；否则需要伪逆、先验约束或改进实验。
+\begin{examplebox}[算例 完整求出直线和每一个残差]
+本例
+\[
+ H^\mathsf TH=\begin{bmatrix}14&6\\6&3\end{bmatrix},\qquad
+ H^\mathsf Ty=\begin{bmatrix}11\\5\end{bmatrix}.
+\]
+由 $6a+3b=5$ 得 $b=5/3-2a$。代入第一行：$14a+10-12a=11$，故 $a=1/2$，$b=2/3$。预测为
+\[
+ \hat y=(7/6,5/3,13/6)^\mathsf T,
+ \qquad r=(-1/6,1/3,-1/6)^\mathsf T.
+\]
+平方和为 $1/36+1/9+1/36=1/6$。并且
+\[
+ H^\mathsf Tr=\begin{bmatrix}-1/6+2/3-3/6\\-1/6+1/3-1/6\end{bmatrix}=0.
+\]
+残差与 $H$ 的每一列都正交，所以预测 $H\hat\beta$ 正是 $y$ 向 $H$ 列空间的正交投影。这个性质比“背下一个求逆公式”更有价值。
+\end{examplebox}
+
+\begin{figure}[htbp]
+\centering\includegraphics[width=0.88\linewidth]{figures/mk_least_squares.pdf}
+\caption{三个测量点不能被同一直线精确穿过。最小二乘使竖直残差的平方和最小；右图列出同一解的三个残差，它们的和为零。}
+\end{figure}
+
+\subsection{伪逆 加权和正则化分别解决什么}
+SVD 令 $H=U\Sigma V^\mathsf T$。把非零奇异值倒数放入 $\Sigma^+$、零奇异值仍置零，得到 Moore--Penrose 伪逆 $H^+=V\Sigma^+U^\mathsf T$。$\hat\beta=H^+y$ 是最小二乘解中欧氏范数最小的一组。对可逆方阵，伪逆就是逆。伪逆不会创造缺失的数据：秩不足时，它只是选择一个数学上明确的解。
+
+若第 $i$ 个测量的噪声标准差为 $s_i$，加权最小二乘采用 $\sum_i r_i^2/s_i^2$。实现时把 $H$ 与 $y$ 的第 $i$ 行都除以 $s_i$；这是“白化”。目标函数里的权重为 $1/s_i^2$，实际乘到方程行上的因子却是 $1/s_i$，两者不要混淆。
+
+正则化（regularization）则额外惩罚参数离参考值 $\beta_0$ 太远：
+\begin{equation}
+ \min_\beta\ \|H\beta-y\|^2+\lambda\|\beta-\beta_0\|^2,
+ \qquad\lambda>0.
+\end{equation}
+它稳定不可靠方向，但会引入偏差。若 $\beta_0$ 不正确，较大的 $\lambda$ 可能把错误固定下来。数值求解优先使用 QR 或 SVD；即使公式写有逆矩阵，也不代表实现时要直接求逆。本章先建立这些概念，后续辨识章节会把它们用于力矩数据，并讨论噪声、参数物理一致性和验证轨迹。
+
+
+\subsection{QR 分解怎样避开正规方程的条件数平方}
+QR 分解把 $H$ 写成 $QR$，其中 $Q$ 的列正交归一，$R$ 为上三角矩阵。对于列满秩的长矩阵，经济型 $Q$ 是 $N\times p$，并不是方阵；$Q^\mathsf TQ=I$，但 $QQ^\mathsf T$ 通常不是单位阵，而是列空间投影。因此精确的残差分解应为
+\begin{equation}
+ \|H\beta-y\|^2
+ =\|R\beta-Q^\mathsf Ty\|^2
+ +\|(I-QQ^\mathsf T)y\|^2.
+\end{equation}
+第二项与参数无关，故最小化第一项即可。若省掉第二项而声称两侧范数总相等，只对相应完整正交变换的写法才成立。
+
+\begin{examplebox}[算例 对同一组三点数据手算 QR]
+第一列 $h_1=(1,2,3)^\mathsf T$ 的长度为 $\sqrt{14}$，所以 $q_1=h_1/\sqrt{14}$。第二列 $h_2=(1,1,1)^\mathsf T$ 在 $q_1$ 上的投影系数为 $r_{12}=q_1^\mathsf Th_2=6/\sqrt{14}$。去掉这一投影：
+\[
+ u_2=h_2-q_1r_{12}=\frac17(4,1,-2)^\mathsf T.
+\]
+其长度为 $\sqrt{21}/7$，归一化得 $q_2=(4,1,-2)^\mathsf T/\sqrt{21}$。因此
+\[
+ R=\begin{bmatrix}\sqrt{14}&6/\sqrt{14}\\0&\sqrt{21}/7\end{bmatrix},
+ \qquad Q^\mathsf Ty=\begin{bmatrix}11/\sqrt{14}\\2/\sqrt{21}\end{bmatrix}.
+\]
+从最后一行回代：$(\sqrt{21}/7)b=2/\sqrt{21}$，故 $b=2/3$。第一行乘 $\sqrt{14}$ 得 $14a+6b=11$，故 $a=1/2$。全程没有构造 $H^\mathsf TH$。这里用的正交化步骤适合手算说明，实际高精度软件常用更稳定的 Householder 反射实现 QR。
+\end{examplebox}
+
+对称正定矩阵还可用 Cholesky 分解 $A=LL^\mathsf T$，$L$ 为下三角矩阵。它相当于把二次型写成 $x^\mathsf TAx=\|L^\mathsf Tx\|^2$，既显示能量非负，也能高效解方程。
+\begin{examplebox}[算例 三角回代代替显式求逆]
+取 $A=\begin{bmatrix}4&2\\2&3\end{bmatrix}$，设 $L=\begin{bmatrix}l_{11}&0\\l_{21}&l_{22}\end{bmatrix}$。比较 $LL^\mathsf T$ 的元素：$l_{11}^2=4$，故 $l_{11}=2$；$l_{11}l_{21}=2$，故 $l_{21}=1$；$l_{21}^2+l_{22}^2=3$，故 $l_{22}=\sqrt2$。
+求 $Ax=(6,5)^\mathsf T$，先解 $Lz=b$：$z_1=3$、$z_2=(5-3)/\sqrt2=\sqrt2$。再解 $L^\mathsf Tx=z$：$x_2=1$、$x_1=(3-1)/2=1$。这两次三角求解比先算完整逆矩阵更直接。
+\end{examplebox}
+
+\subsection{梯度 Hessian 和局部二次近似}
+梯度（gradient）把一个标量函数对每个参数的偏导排成列向量。对 $E(x_1,x_2)=x_1^2+2x_1x_2+3x_2^2$，
+\[
+ \nabla E=\begin{bmatrix}2x_1+2x_2\\2x_1+6x_2\end{bmatrix}.
+\]
+它指向局部增加最快的方向，沿负梯度走可在足够小的步长下降低函数值。Hessian 矩阵（海森矩阵）再对梯度求偏导，描述曲率：$\nabla^2E=\begin{bmatrix}2&2\\2&6\end{bmatrix}$。二阶展开是
+\begin{equation}
+ E(x+\delta x)\approx E(x)+\nabla E(x)^\mathsf T\delta x
+ +\tfrac12\delta x^\mathsf T\nabla^2E(x)\delta x.
+\end{equation}
+对这个二次函数，展开其实严格相等；对一般非线性函数才是局部近似。正规方程中的 $H^\mathsf TH$ 与最小二乘目标的 Hessian 直接有关：取目标 $\frac12\|H\beta-y\|^2$，Hessian 恰为 $H^\mathsf TH$。列不独立时有平坦方向，意味着某些参数变化不改变预测；这正是辨识不可区分参数的数学表现。
+
+\section{均值 方差 协方差为观测器做准备}
+随机变量（random variable）描述重复测量时可能变化的数。期望 $\mathbb E[x]$ 是理想重复实验的平均；有限 $N$ 次测量的样本均值为 $\bar x=N^{-1}\sum_i x_i$。方差衡量分散程度，单位是原量单位的平方；标准差为方差平方根，恢复原单位。估计未知总体方差常用
+\begin{equation}
+ s^2=\frac{1}{N-1}\sum_{i=1}^N(x_i-\bar x)^2.
+\end{equation}
+\begin{examplebox}[算例 位置测量的均值和标准差]
+四次读数为 $9.9,10.1,10.0,10.0\,\mathrm{mm}$。均值 $\bar x=10.0\,\mathrm{mm}$，偏差平方和为 $0.01+0.01=0.02\,\mathrm{mm}^2$，所以无偏样本方差为 $0.02/3=0.006667\,\mathrm{mm}^2$，标准差为 $0.08165\,\mathrm{mm}$。若计算的是这四个数本身的平均平方偏差，分母用 4，得到 $0.005\,\mathrm{mm}^2$；两者用途不同，不是互相矛盾。
+\end{examplebox}
+
+多维随机量的协方差矩阵定义为 $P=\mathbb E[(x-\mu)(x-\mu)^\mathsf T]$。对角元素是每一维的方差，非对角元素描述两维偏差是否倾向一起变化。例如 $P=\begin{bmatrix}4&1\\1&1\end{bmatrix}\,\mathrm{mm}^2$ 表示第一维标准差为 $2\,\mathrm{mm}$、第二维为 $1\,\mathrm{mm}$，相关系数为 $1/(2\cdot1)=0.5$。误差椭圆倾斜，不能只用两个独立误差条完全描述。
+
+高斯分布（Gaussian distribution）由均值和协方差确定，但现实噪声不一定高斯。白噪声表示不同采样时刻不相关且具有约定的恒定功率谱；“白”不等于“高斯”，不相关也不普遍等于统计独立。编码器量化、摩擦切换、温漂都可能产生有结构的误差。学习这些词是为了识别模型假设，而不是给所有残差一律贴上“白高斯噪声”的标签。
+
+
+\subsection{不确定度怎样通过一个矩阵传到输出}
+设随机误差 $\delta x$ 均值为零，协方差为 $P_x$；线性输出误差为 $\delta y=A\delta x$。直接代定义：
+\begin{equation}
+ P_y=\mathbb E[(A\delta x)(A\delta x)^\mathsf T]
+ =A\mathbb E[\delta x\delta x^\mathsf T]A^\mathsf T
+ =AP_xA^\mathsf T.
+\end{equation}
+这条式子是卡尔曼滤波协方差预测、误差传播和标定置信度计算的共同基础。若输入误差相关，必须保留协方差的非对角项。
+例如两关节测量误差互相独立，标准差都为 $0.001\,\mathrm{rad}$，那么 $P_q=10^{-6}I$。在本章标准姿态，由局部误差 $\delta p\approx J\delta q$，有
+\[
+ P_p\approx10^{-6}JJ^\mathsf T
+ =10^{-6}\begin{bmatrix}0.5&-0.25\\-0.25&0.25\end{bmatrix}\mathrm{m^2}.
+\]
+位置标准差分别为 $0.707107\,\mathrm{mm}$ 和 $0.5\,\mathrm{mm}$，相关系数为 $-0.25/\sqrt{0.5\times0.25}=-0.707107$。两个关节噪声独立，末端两轴误差却相关；是几何映射产生了这种相关性。这个结果是小噪声一阶传播近似，并未包含几何尺寸和零偏的不确定度。
+
+\section{计算练习与逐步解答}
+\subsection*{题目}
+\begin{enumerate}
+\item 已知 $A=\begin{bmatrix}3&1\\1&2\end{bmatrix}$、$b=(7,4)^\mathsf T$，求 $x$，计算 $\det A$，并判断 $A$ 是否正定。
+\item 矩阵 $B=\begin{bmatrix}1&0&1\\0&1&1\end{bmatrix}$ 将三维输入变成二维输出。求一个非零零空间向量；对输出 $(1,2)^\mathsf T$ 写出所有解，并求最小范数解。
+\item 用常数 $c$ 拟合测量 $1,2,3$。先求普通最小二乘，再在噪声标准差为 $1,1,2$ 时求加权最小二乘。
+\item 对 $D=\operatorname{diag}(2,0.02)$，求奇异值、条件数、$D^\mathsf TD$ 的条件数。若右端 $b=(2,0.02)^\mathsf T$ 的第二分量增加 0.002，求参数变化。
+\end{enumerate}
+\subsection*{解答}
+\begin{enumerate}
+\item $\det A=3\cdot2-1=5$。$A^{-1}=\frac15\begin{bmatrix}2&-1\\-1&3\end{bmatrix}$，所以 $x=\frac15(14-4,-7+12)^\mathsf T=(2,1)^\mathsf T$。$A$ 对称、第一顺序主子式为 $3>0$、行列式为 $5>0$，故正定。代回得 $(3\cdot2+1,2+2)^\mathsf T=(7,4)^\mathsf T$。
+\item 方程为 $x_1+x_3=1$、$x_2+x_3=2$。令 $x_3=t$，则 $x=(1-t,2-t,t)^\mathsf T$；零空间方向为 $(-1,-1,1)^\mathsf T$。范数平方为 $(1-t)^2+(2-t)^2+t^2=5-6t+3t^2$，导数为 $-6+6t$，在 $t=1$ 最小，故最小范数解为 $(0,1,1)^\mathsf T$。
+\item 普通目标为 $(1-c)^2+(2-c)^2+(3-c)^2$，导数 $6c-12=0$，得 $c=2$。加权目标为 $(1-c)^2+(2-c)^2+(3-c)^2/4$，导数为 $2[(c-1)+(c-2)+(c-3)/4]=0$，得 $c=(1+2+3/4)/(1+1+1/4)=5/3$。第三个较不可靠的测量对结果影响变小。
+\item 奇异值为 $2,0.02$，$\kappa_2(D)=100$。$D^\mathsf TD=\operatorname{diag}(4,0.0004)$，条件数为 $10\,000=100^2$。原解为 $(1,1)^\mathsf T$，新解为 $(1,1.1)^\mathsf T$。第二个参数变化 0.1；小奇异值方向的绝对噪声被放大了 $1/0.02=50$ 倍。
+\end{enumerate}
+
+\section*{本章与原稿的对应}
+本章整合 [A，第2--5页] 与 [B，第3、8--17页] 的线性代数、最小二乘和概率内容。补全了单位与尺度、秩与零空间、逐项求导和数值计算；修正了对称不定矩阵的 SVD、一般矩阵可对角化及条件数适用范围的表述。

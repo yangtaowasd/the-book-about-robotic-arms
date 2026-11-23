@@ -1,0 +1,155 @@
+\chapter{遥操作 视觉伺服与通信延迟}
+\label{ch:teleoperation}
+
+遥操作是一条闭环信息链：人给出运动意图，映射层转换坐标和尺度，机器人控制器执行，再把图像、状态或力反馈给人。即使每一部分单独正确，坐标混用、时间错位或模式切换仍会破坏整条链。本章先把运动映射算清楚，再讨论为什么有力反馈后延迟尤其重要。
+
+\section{主从同构和笛卡尔映射}
+
+同构主从臂常用关节映射
+\begin{equation}
+q_s=q_{s0}+S_q(q_m-q_{m0}),
+\end{equation}
+其中 $m$ 表示主端，$s$ 表示从端；$S_q$ 包含比例和方向修正。关节数相同不代表关节轴顺序、零位和符号相同，必须逐项定义。若主从结构不同，用末端位姿映射通常更自然。
+
+对于位置增量，设 $R_{BM}$ 把主端参考系 $M$ 中的向量转到机器人基座系 $B$，按下离合时记录两端参考位置，随后用
+\begin{equation}
+p_{Bd}(t)=p_{Bd0}+s_pR_{BM}\big[p_{MH}(t)-p_{MH0}\big].
+\end{equation}
+$s_p$ 是无量纲位移缩放。取 $R_{BM}=R_z(90^\circ)$，$s_p=0.3$，手柄向自身参考系 $x$ 方向移动 $0.2\,\mathrm m$，从端增量为
+\[
+0.3\begin{bmatrix}0&-1&0\\1&0&0\\0&0&1\end{bmatrix}
+\begin{bmatrix}0.2\\0\\0\end{bmatrix}
+=\begin{bmatrix}0\\0.06\\0\end{bmatrix}\mathrm m.
+\]
+只乘缩放而漏掉旋转，会让手柄和机器人运动方向相差 $90^\circ$。
+
+\subsection{姿态增量不能按三个欧拉角相减}
+
+令 $R_{MH}(t)$ 是手柄姿态。以主端固定参考系表达的相对转动为
+\begin{equation}
+\Delta R_M=R_{MH}(t)R_{MH0}^{\mathsf T}.
+\end{equation}
+将它换到机器人基座系：$\Delta R_B=R_{BM}\Delta R_MR_{BM}^{\mathsf T}$。若不缩放角度，目标姿态为 $R_{Bd}=\Delta R_BR_{Bd0}$。若将旋转角缩小到 $s_R$ 倍，可以在选定对数分支后使用
+\begin{equation}
+R_{Bd}=\exp\!\big(s_R\log\Delta R_B\big)R_{Bd0}.
+\end{equation}
+右乘增量则表示在工具局部轴上的转动，是另一种操作语义。二者都可以合理，但必须与用户看到的坐标轴一致。
+
+\subsection{离合为什么需要重新锁定参考}
+
+\textbf{离合（clutch）}允许操作者暂时松开映射，重新摆放手柄。松开期间机器人保持当前目标或按任务设定停止；再次按下时，把此刻手柄和机器人目标都作为新的零增量参考。若只更新手柄零点而保留旧机器人原点，可能发生目标跳变；若把收到的第一帧直接当绝对目标，也可能突然跨越很大距离。
+
+\section{从目标位姿到连续关节命令}
+
+设几何任务误差用当前减目标表示为 $e_x$，局部闭环差分逆运动学可写成
+\begin{equation}
+\dot q=J^\#(v_d-K_xe_x)+N\dot q_0.
+\end{equation}
+$J^\#$ 是选定的伪逆或阻尼逆，$N$ 是相应冗余处理。对位置任务，$\dot e_x=J\dot q-v_d$；理想满行秩且使用精确右逆时，主任务满足 $\dot e_x=-K_xe_x$。姿态任务的对数误差还要处理误差雅可比，不能把三维位置推导直接当成任意大姿态误差的精确公式。
+
+只做 $q_{k+1}=q_k+T_sJ^\#v_d$ 的开环积分，模型误差和跟踪误差会累积。每拍根据实测 $q$ 重算当前位姿并反馈误差，才形成真正闭环。若用阻尼逆，主任务本身会有近似误差；若关节速度限幅被触发，还要重新判断实际能够实现的任务速度。
+
+MoveIt Servo 在 Humble 文档中提供带时间戳的关节点动和末端速度输入，并包含奇异和碰撞检查。它能帮助实现反应式运动，但具体接口取决于版本；这些软件检查也不等于对真实环境的无限可靠保证。\cite{moveit}
+
+\section{延迟怎样变成相位损失和空间误差}
+
+固定延迟 $T_d$ 的频率响应为
+\begin{equation}
+G_d(j\omega)=e^{-j\omega T_d},\qquad |G_d|=1,\qquad
+\angle G_d=-\omega T_d.
+\end{equation}
+延迟不衰减幅值，却使反馈“看见过去”。在 $5\,\mathrm{Hz}$ 上，$40\,\mathrm{ms}$ 延迟造成 $-2\pi\times5\times0.04=-1.2566\,\mathrm{rad}=-72^\circ$ 相位；如果一个闭环经过两次这种延迟，总计就可能损失 $144^\circ$。真实链路还包含滤波、采样和执行器，不应只测网络 ping。
+
+\begin{figure}[htbp]\centering
+\includegraphics[width=0.92\linewidth]{figures/rt_latency.pdf}
+\caption{同一正弦运动在不同延迟下的相位差，以及延迟造成的相位损失。频率越高，同样毫秒数的影响越大。}
+\end{figure}
+
+在低速匀速近似下，位置落后量为 $\delta p\approx vT_d$。以 $v=0.2\,\mathrm{m/s},T_d=0.1\,\mathrm s$ 为例，落后为 $0.02\,\mathrm m$。假定停止指令到达后还能以 $1\,\mathrm{m/s^2}$ 恒定制动，制动距离为 $v^2/(2a)=0.02\,\mathrm m$，总计约 $4\,\mathrm{cm}$。这是给定假设下的计算，不是任何设备的统一停止距离。
+
+\section{双边力反馈需要同时看运动和能量}
+
+无力反馈时，人通过图像判断远端状态。加入力反馈后，远端接触力又作用到人的手，形成一个包含主端、从端、操作者、环境和通信的闭环。位置误差型反作用力和直接环境力反射不是同一种反馈：前者连自由空间中的跟踪滞后也会反映成“手感很重”。
+
+对位置比例关系 $\delta p_s=s_pR_{BM}\delta p_m$，相同虚功要求反射到手上的环境力为
+\begin{equation}
+F_{m,\rm display}=s_pR_{BM}^{\mathsf T}F_{s,\rm env}.
+\end{equation}
+因为 $F_{m,\rm display}^{\mathsf T}\delta p_m=F_{s,\rm env}^{\mathsf T}\delta p_s$。其中 $F_{s,\rm env}$ 指环境施加在从端上的力，反射方向应让操作者感到阻碍，不能误把机器人施加给环境的反向力直接照搬。人为改变力缩放当然可以，但此时不能再声称这个映射天然保持相同功率。
+
+\subsection{波变量为什么能处理理想恒定延迟}
+
+\textbf{无源（passive）}系统不会凭空向外输出超过初始储能和此前输入的能量。对一个通信端口，令 $F$ 为流入通道的力，$v$ 为按端口约定的速度，选择正的\textbf{波阻抗} $Z_w$，单位 $\mathrm{N\,s/m}$。定义
+\begin{equation}
+a^+=\frac{F+Z_wv}{\sqrt{2Z_w}},\qquad
+a^-=\frac{F-Z_wv}{\sqrt{2Z_w}}.
+\end{equation}
+两式平方相减，分子中 $F^2$ 和 $Z_w^2v^2$ 抵消，留下
+\begin{equation}
+Fv=\tfrac12\big[(a^+)^2-(a^-)^2\big].
+\end{equation}
+功率变成输入波能量与输出波能量之差。理想、恒定且非负延迟只把已经进入的波延后输出，可以把未到达部分解释成通道中的储能。因此，在相应端口连接和无源终端假设下，通信通道能保持无源。时变延迟、丢包处理、采样保持以及非无源控制器还需额外设计。它并不保证“无论怎样写软件，任何延迟都稳定”。\cite{niemeyer}
+
+\begin{examplebox}[验证功率恒等式]
+取 $F=4\,\mathrm N,v=0.2\,\mathrm{m/s},Z_w=20\,\mathrm{N\,s/m}$。
+$Z_wv=4\,\mathrm N$，于是 $a^+=8/\sqrt{40}=1.26491$，$a^-=0$。
+波能量差为 $1.26491^2/2=0.8\,\mathrm W$，恰好等于 $Fv=4\times0.2=0.8\,\mathrm W$。
+\end{examplebox}
+
+\subsection{时域无源控制的符号必须讲清}
+
+用采样周期 $T_s$ 累积端口流入能量 $E_n=E_0+\sum_{k=0}^nF_kv_kT_s$。如果某一步试算 $E_n<0$，表示当前离散实现输出了账面上没有的能量。对 $v_n\ne0$，可添加耗散系数
+\begin{equation}
+b_{\rm pc}=\frac{-E_n}{T_sv_n^2}.
+\end{equation}
+把通道端口力改为 $F_n+b_{\rm pc}v_n$，对机器人或人产生的反作用阻尼则是 $-b_{\rm pc}v_n$。两个符号属于相反的端口，不能混用。
+
+例如 $E_n=-0.002\,\mathrm J,T_s=0.001\,\mathrm s,v_n=0.2\,\mathrm{m/s}$，需 $b_{\rm pc}=50\,\mathrm{N\,s/m}$，对应反作用力 $-10\,\mathrm N$，该步耗散 $10\times0.2\times0.001=0.002\,\mathrm J$。当速度接近零时，这个除法会产生很大增益；真实实现需要一致的离散能量账本、限幅和近零速度处理。若力已被限幅，不能仍记账为“所需能量已全部耗散”。
+
+\section{视觉伺服把图像误差变成运动}
+
+\textbf{视觉伺服（visual servoing）}使用相机观测闭环控制运动。\textbf{PBVS}先估计三维位姿再控制；\textbf{IBVS}直接控制图像特征。这里推导一个点特征的最小例子，说明它与雅可比的关系。\cite{corke}
+
+设固定场景点在相机坐标中为 $P=(X,Y,Z)$，$Z>0$。归一化成像坐标 $u=X/Z,v=Y/Z$；像素坐标可由焦距和主点换算得到。若相机平移速度为 $(v_x,v_y,v_z)$、角速度为 $(\omega_x,\omega_y,\omega_z)$，都表达在相机系，固定点相对相机满足
+\begin{equation}
+\dot P=-v_c-\omega_c\times P.
+\end{equation}
+先对 $u=X/Z$ 用商法则：$\dot u=(\dot XZ-X\dot Z)/Z^2$；$v$ 同理。逐项代入叉乘后得到
+\begin{equation}
+\begin{bmatrix}\dot u\\\dot v\end{bmatrix}
+=L\begin{bmatrix}v_x\\v_y\\v_z\\\omega_x\\\omega_y\\\omega_z\end{bmatrix},\quad
+L=\begin{bmatrix}
+-1/Z&0&u/Z&uv&-(1+u^2)&v\\
+0&-1/Z&v/Z&1+v^2&-uv&-u
+\end{bmatrix}.
+\end{equation}
+$L$ 叫\textbf{交互矩阵（interaction matrix）}，又称图像雅可比。它把相机速度映射到图像特征速度。一个点只有两条观测方程，无法唯一决定六维相机速度，需要多个特征或约束部分自由度。
+
+\begin{examplebox}[只沿相机横向移动]
+假定只允许 $v_x$，目标 $u_d=0$，当前 $u=0.1$，深度 $Z=1\,\mathrm m$，取误差衰减率 $\lambda=2\,\mathrm{s^{-1}}$。要求 $\dot u=-\lambda(u-u_d)=-0.2\,\mathrm{s^{-1}}$。
+因为 $\dot u=-v_x/Z$，所以 $v_x=0.2\,\mathrm{m/s}$。
+相机向右移，静止目标在图像中向左移，符号由几何决定。
+若深度实际为 $2\,\mathrm m$，同一速度只产生 $-0.1\,\mathrm{s^{-1}}$ 的特征速度，说明深度误差会改变闭环响应。
+\end{examplebox}
+
+要控制机械臂，还需把相机速度映射到关节：$\dot s_{m img}=LJ_c\dot q$，其中 $J_c$ 必须是相机参考点、相机坐标轴、线速度在前角速度在后的雅可比。相机和工具存在偏置时，不能直接拿工具原点雅可比代替。视觉通常还存在曝光、图像传输和特征计算延迟，末端快速稳定不能只依赖低频图像反馈。
+
+\section{计算练习与解答}
+
+\subsection*{题一 延迟相位}
+闭环关键频率为 $8\,\mathrm{Hz}$，额外延迟为 $15\,\mathrm{ms}$。求相位损失。
+
+解：$\omega T_d=2\pi\times8\times0.015=0.75398\,\mathrm{rad}$，换成角度为 $43.2^\circ$。这是额外损失，不是整个系统的相位裕度。
+
+\subsection*{题二 坐标和缩放}
+主端位移为 $(0.1,-0.2,0)\,\mathrm m$，$R_{BM}=R_z(90^\circ),s_p=0.5$。求从端位移。
+
+解：旋转后为 $(0.2,0.1,0)$，缩放后为 $(0.1,0.05,0)\,\mathrm m$。旋转保留长度，缩放把长度减半。
+
+\subsection*{题三 图像误差}
+归一化横坐标误差为 $0.05$，深度为 $0.8\,\mathrm m$，只控制横移，$\lambda=1.5\,\mathrm{s^{-1}}$。求横向相机速度。
+
+解：$\dot u=-1.5\times0.05=-0.075\,\mathrm{s^{-1}}$。由 $\dot u=-v_x/Z$，得 $v_x=0.8\times0.075=0.06\,\mathrm{m/s}$。这是相机坐标系速度，仍需通过相机雅可比转成关节命令。
+
+\section*{本章与原稿的对应}
+本章对应 [B，第97--100页]，并延伸其相机云台应用。波变量和无源控制补出端口方向及功率推导；视觉伺服为整合新增内容，用于把坐标变换、雅可比和相机任务连接起来。

@@ -1,0 +1,26 @@
+{
+  "title": "机械臂控制与仿真详细教材",
+  "edition_date": "2026-11-23",
+  "pdf_pages": 231,
+  "main_chapters": 23,
+  "appendices": 4,
+  "numbered_figures": 57,
+  "boxed_worked_examples": 114,
+  "end_of_chapter_exercises_with_solutions": 83,
+  "glossary_entries": 80,
+  "pdf_bookmarks": 250,
+  "numerical_checks": {
+    "math_assertions": 59,
+    "dynamics_and_structure_checks": 46,
+    "appendix_checks": 20,
+    "control_checks": "Riccati residual, ZOH, Kalman, operational space and projection calculations",
+    "integrated_experiment": "explicit 2R equations, analytic actuator stages plus RK4, synthetic identification and independent validation"
+  },
+  "experiment_scope": "Educational synthetic 2R; no hardware measurements; MuJoCo XML is illustrative and was not executed",
+  "python_dependencies": {
+    "numpy": "2.3.5",
+    "scipy": "1.17.0",
+    "sympy": "1.14.0",
+    "matplotlib": "3.10.8"
+  }
+}

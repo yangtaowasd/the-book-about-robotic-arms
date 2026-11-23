@@ -1,0 +1,176 @@
+\chapter{仿真模型 数值积分与真实误差}
+\label{ch:simulation}
+
+仿真应回答具体问题：公式是否写对，模型误差会造成多大偏差，传感器和执行器的非理想因素是否能解释真实现象。只有动画动起来，无法回答这些问题。本章把“对象真值”“控制器模型”“测量”和“评价量”分开，让同一套仿真既可以做正确性核验，也可以研究模型失配。
+
+\section{正动力学如何推进一个时间步}
+
+忽略接触时，动力学为
+\begin{equation}
+M(q)\ddot q=\tau_{\rm act}+\tau_{\rm ext}-C(q,\dot q)\dot q-g(q)-\tau_f.
+\end{equation}
+先解线性方程求加速度，再用数值积分更新速度和位置。\textbf{数值积分器}不是控制器，它只是近似连续微分方程的演化。即使控制律相同，不同积分器和步长也可能产生不同的数值误差。
+
+取一维关节 $J=0.1\,\mathrm{kg\,m^2}$，当前驱动力矩为 $1$，黏性摩擦 $b\dot q=0.2\times0.5=0.1$，此处重力矩为 $0.4\,\mathrm{N\,m}$，则
+\[
+\ddot q=(1-0.1-0.4)/0.1=5\,\mathrm{rad/s^2}.
+\]
+用半隐式欧拉、步长 $h=0.001\,\mathrm s$，从 $q=0.2,\dot q=0.5$ 出发：
+\[
+\dot q^+=0.5+0.001\times5=0.505,
+\quad q^+=0.2+0.001\times0.505=0.200505.
+\]
+若在这一小步把加速度当常数，精确运动学为 $q^+=0.2+0.5h+5h^2/2=0.2005025$。差值 $2.5\times10^{-6}\,\mathrm{rad}$ 是离散积分误差，不是控制器突然变差。
+
+\section{仿真周期与控制周期为什么要分开}
+
+设控制器 $T_s=5\,\mathrm{ms}$ 更新一次，物理仿真步长 $h=0.5\,\mathrm{ms}$，则每十个物理步计算一次新命令，其间保持上一命令，这就是\textbf{零阶保持}。传感器采样、网络到达和执行器生效还可以各有自己的时间。
+
+较小物理步长有助于解析执行器和接触的快动态，但并不是“必须永远小于控制周期”的数学定理。恰当的离散模型可以直接按控制周期仿真；关键是明确离散化和保持关系。若为了计算更精细而每个物理小步都更新控制器，就把本来 $200\,\mathrm{Hz}$ 的控制器悄悄变成了 $2000\,\mathrm{Hz}$，结论会偏乐观。
+
+\begin{figure}[htbp]\centering
+\includegraphics[width=0.94\linewidth]{figures/rt_zoh_actuator.pdf}
+\caption{控制命令零阶保持与一阶执行器的实际力矩。命令更新、传输延迟和力矩建立是不同过程；给仿真增加一个“延迟参数”时要说明它放在哪一段。}
+\end{figure}
+
+一个与具体仿真器无关的调度结构如下。这里的代码是结构示意，传感器和执行器封装应有实际实现。
+\begin{lstlisting}[language=Python]
+for physics_step in range(n_steps):
+    if physics_step % control_stride == 0:
+        measurement = sensors.sample_and_delay(plant_state)
+        reference = trajectory.sample(control_time)
+        command = controller(measurement, reference, nominal_model)
+    applied_torque = actuator.update(command, physics_dt)
+    plant_state = plant.step(applied_torque, physics_dt)
+    evaluator.record(plant_state, measurement, command)
+\end{lstlisting}
+控制器只拿到约定测量，评价器才读取真值；两条数据通道不能在不知情时混合。
+
+\section{执行器一阶滞后可以精确离散}
+
+用 $T_a>0$ 表示力矩建立时间常数：
+\begin{equation}
+T_a\dot\tau_a+\tau_a=\tau_c.
+\end{equation}
+若一小步内命令 $\tau_c$ 恒定，令误差 $z=\tau_a-\tau_c$，得到 $\dot z=-z/T_a$，所以
+\begin{equation}
+\tau_a[k+1]=e^{-h/T_a}\tau_a[k]+(1-e^{-h/T_a})\tau_c[k].
+\end{equation}
+取 $T_a=3\,\mathrm{ms},h=0.5\,\mathrm{ms}$，系数 $e^{-1/6}=0.846482$。命令从零跳到 $10\,\mathrm{N\,m}$，第一步实际力矩只有 $1.53518\,\mathrm{N\,m}$；经过 $5\,\mathrm{ms}$ 达到 $10(1-e^{-5/3})=8.11124\,\mathrm{N\,m}$。若还有一拍通信延迟，就先把命令放入延迟队列，再送进这个动态方程。
+
+力矩限幅、力矩变化率限幅、速度相关降额和温度降额是不同约束。把它们都简化成同一个常数截断，只能作为第一版模型，不能声称模拟了驱动器全部行为。
+
+\section{测量噪声为什么让加速度特别难看}
+
+对于量化间隔 $\Delta q$，若量化误差近似独立均匀分布于 $[-\Delta q/2,\Delta q/2]$，其方差为 $\Delta q^2/12$。二阶差分
+\begin{equation}
+\hat{\ddot q}_k=\frac{q_{k+1}-2q_k+q_{k-1}}{T_s^2}
+\end{equation}
+的噪声方差为
+\begin{equation}
+\sigma_{\ddot q}^2=\frac{(1^2+(-2)^2+1^2)\Delta q^2}{12T_s^4}
+=\frac{\Delta q^2}{2T_s^4}.
+\end{equation}
+十七位每转编码器的 $\Delta q=2\pi/2^{17}=4.79369\times10^{-5}\,\mathrm{rad}$。在 $T_s=1\,\mathrm{ms}$ 时，标准差约 $33.90\,\mathrm{rad/s^2}$；在 $T_s=5\,\mathrm{ms}$ 时约 $1.356\,\mathrm{rad/s^2}$。这些数依赖独立量化误差假设，真实静止编码器可能表现为相关或零变化误差，但足以说明“采样越快，直接差分就越准”不成立。
+
+离线辨识可以用轨迹拟合、平滑微分或积分形式回归；实时速度估计可以用滤波器或状态观测器。把未来点参与的中心差分直接写进实时控制器，则需要明确它等价于引入等待延迟。
+
+\section{MuJoCo 中的模型和状态}
+
+MuJoCo 使用 \texttt{mjModel} 保存编译后的模型，\texttt{mjData} 保存状态和计算工作区；\texttt{mj\_step} 推进一步动力学，\texttt{mj\_forward} 在当前状态计算派生量，\texttt{mj\_inverse} 处理逆动力学。模型和数据对象应相互对应。\cite{mujocosim}
+
+原生 MJCF 通过嵌套 body 表达机构树，关节定义该 body 相对父 body 的运动自由度。\texttt{inertial} 给出质量、质心和惯量；\texttt{armature}、\texttt{damping}、\texttt{frictionloss} 分别用于附加关节惯量、黏性阻尼和干摩擦相关约束。它们的求解语义需要分开，不应把所有字段都理解成可随意相加的同一种力矩。\cite{mujocomodel}
+
+下面是用于本书平面 2R 思考实验的模型核心。角度用弧度，重力沿 $-y$；几何用于显示，动力学惯量显式指定。沿杆轴的小惯量 $I_{xx}$ 用于构造合法三维刚体，绕运动平面法向的转动采用 $I_{zz}=1/48\,\mathrm{kg\,m^2}$。
+\begin{lstlisting}[language=XML]
+<mujoco model="teaching_2r">
+  <compiler angle="radian"/>
+  <option timestep="0.0005" gravity="0 -9.81 0"/>
+  <worldbody>
+    <body name="link1">
+      <joint name="q1" type="hinge" axis="0 0 1"/>
+      <inertial pos="0.25 0 0" mass="1"
+          diaginertia="0.0001 0.0208333333 0.0208333333"/>
+      <geom type="capsule" fromto="0 0 0 0.5 0 0"
+          size="0.015" contype="0" conaffinity="0"/>
+      <body name="link2" pos="0.5 0 0">
+        <joint name="q2" type="hinge" axis="0 0 1"/>
+        <inertial pos="0.25 0 0" mass="1"
+            diaginertia="0.0001 0.0208333333 0.0208333333"/>
+        <geom type="capsule" fromto="0 0 0 0.5 0 0"
+            size="0.015" contype="0" conaffinity="0"/>
+        <site name="tip" pos="0.5 0 0"/>
+      </body>
+    </body>
+  </worldbody>
+  <actuator>
+    <motor joint="q1" gear="1"/>
+    <motor joint="q2" gear="1"/>
+  </actuator>
+</mujoco>
+\end{lstlisting}
+在这个模型中关闭了接触，目的是先对账自由空间动力学。它不包含真实电机、线缆、抱闸或传动弹性。控制输入在上述关节与 \texttt{gear=1} 约定下可解释为关节力矩；一般执行器的 \texttt{ctrl} 含义由传动和增益共同决定，不能对所有模型都直接赋值 $\tau$。
+
+在 $q=(0,\pi/2)$、速度零时，本书的手算结果为
+\begin{equation}
+M=\begin{bmatrix}5/12&1/12\\1/12&1/12\end{bmatrix},\qquad
+g=\begin{bmatrix}7.3575\\0\end{bmatrix}.
+\end{equation}
+模型核验阶段可以读取仿真器的质量矩阵和偏置项来比较；在评价未知参数辨识或模型失配的控制器时，则应禁止控制器读取这些真值。核验阶段知道答案是合理的，实验阶段把答案偷偷传给待评价算法才是问题。
+
+\section{接触参数不是简单的材料常数复制}
+
+MuJoCo 的接触约束采用带正则化的软接触模型。\texttt{solref} 和 \texttt{solimp} 共同影响约束参考动力学和阻抗，且受接触几何、有效质量及求解设置影响。直接参数形式中的“刚度”和“阻尼”不能不经核对就认作材料的 $\mathrm{N/m}$ 与 $\mathrm{N\,s/m}$ 常数。\cite{mujocomputation}
+
+若需要研究一个力控算法，先用明确的教学弹簧阻尼接触模型建立预期。例如法向压入量 $\delta>0$ 时 $F_n=k_e\delta+d_e\dot\delta$，必要时施加单向非拉力约束；取 $k_e=10000\,\mathrm{N/m}$、静态压入 $1\,\mathrm{mm}$，弹簧力为 $10\,\mathrm N$。然后再对照仿真器的接触力和压入量标定参数。不要因为动画中“已经碰到墙”，就默认法向力和接触刚度正确。
+
+真实力传感器对应的仿真测量，可以来自接触力或传感器接口，并添加相应带宽、偏置和噪声。若现实中没有该传感器，却把无噪声的接触真值送进控制器，就改变了问题的可观测条件。反过来，现实有力传感器时，完全禁止仿真控制器使用任何接触测量也不合理；关键是传感器能力一致。
+
+\section{真值模型与控制器模型的分离}
+
+建立三套概念上独立的参数：名义参数 $\theta_{\rm nom}$，仿真对象真值 $\theta_{\rm true}$，以及数据辨识结果 $\hat\theta$。真值可以按实验设计扰动，但惯量必须保持物理一致，不能给每个惯量元素独立乘随机数后就认定仍是合法刚体。
+
+最简单的模型误差算例是常值重力残差。考虑
+\[
+J\ddot q+b\dot q+g_0=-K_p(q-q_d)-K_d\dot q+\hat g_0.
+\]
+在静态平衡，
+\begin{equation}
+e_\infty=q-q_d=(\hat g_0-g_0)/K_p.
+\end{equation}
+取 $g_0=2,\hat g_0=1.8\,\mathrm{N\,m},K_p=8\,\mathrm{N\,m/rad}$，稳态误差为 $-0.025\,\mathrm{rad}$。若错误地把真值 $g_0$ 给了控制器，这个偏差就消失，仿真会告诉你“模型补偿完美”，但没有评价你真正关心的误差。
+
+\begin{figure}[htbp]\centering
+\includegraphics[width=0.92\linewidth]{figures/rt_model_mismatch.pdf}
+\caption{同一关节控制器在不同重力补偿误差下的响应。图为本教材的一维教学模型数值积分，曲线不代表 NERO 实测。末端稳态偏差与残余力矩除以刚度一致。}
+\end{figure}
+
+\section{如何证明结论不是步长造成的}
+
+固定控制周期、模型和输入，只将物理积分步长从 $h$ 改为 $h/2$，比较轨迹误差、接触峰值和能量残差。如果关键结论大幅改变，说明还未达到足够的数值分辨率，或接触/控制存在快动态。不能在缩小物理步长时顺手加快控制器，再把改进全归功于积分器。
+
+对无阻尼、无输入的保守系统，比较总机械能 $E=\tfrac12\dot q^\mathsf TM\dot q+U(q)$。对有力矩和摩擦的系统，比较能量收支残差
+\begin{equation}
+r_E(t)=E(t)-E(0)-\int_0^t\dot q^\mathsf T(\tau_{\rm act}+\tau_{\rm ext}-\tau_f)\,dt.
+\end{equation}
+能量不恒定不一定是错误：执行器做功和阻尼耗能本来就会改变能量。自由摆动仿真中“能量完全不变”也不能证明所有模型参数正确，它只检查了某些数值与结构性质。
+
+\section{计算练习与解答}
+
+\subsection*{题一 多速率仿真}
+控制频率 $200\,\mathrm{Hz}$，物理步长 $0.25\,\mathrm{ms}$。每多少物理步更新控制？十秒有多少次控制更新？
+
+解：控制周期 $5\,\mathrm{ms}$，故步数比为 $5/0.25=20$。十秒共有 $10/0.005=2000$ 个完整控制周期；起点是否额外记录一帧属于记录约定，不应算成额外持续时间。
+
+\subsection*{题二 量化和差分}
+若编码器分辨率增加一位，采样周期不变，二阶差分量化噪声标准差怎样变化？
+
+解：一转计数翻倍，$\Delta q$ 减半。由 $\sigma_{\ddot q}=\Delta q/(\sqrt2T_s^2)$，标准差也减半，方差变为四分之一。若同时把周期减半，标准差反而变为原来的两倍。
+
+\subsection*{题三 补偿残差}
+静态误差 $-0.04\,\mathrm{rad}$，刚度 $5\,\mathrm{N\,m/rad}$，忽略摩擦及外力，估计重力补偿残差。
+
+解：$\hat g-g=K_pe=5\times(-0.04)=-0.2\,\mathrm{N\,m}$，表示补偿不足。若有静摩擦或外接触，这一计算只能得到合成残差，不能唯一指向重力模型。
+
+\section*{本章与原稿的对应}
+本章对应 [A，第72--73页] 与 [B，第111--116、125--127页]。补出传感器差分噪声、执行器离散化、多速率循环与模型分离的计算；修正接触参数直接等于材料常数、控制周期必须等于仿真步长等不够准确的表述。

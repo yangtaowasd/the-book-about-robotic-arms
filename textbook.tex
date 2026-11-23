@@ -1,0 +1,106 @@
+\documentclass[11pt,a4paper,oneside,openany]{book}
+\usepackage{fontspec}
+\setmainfont{Noto Serif CJK SC}[BoldFont={Noto Serif CJK SC Bold}]
+\setsansfont{Noto Sans CJK SC}[BoldFont={Noto Sans CJK SC Bold}]
+\setmonofont{DejaVu Sans Mono}[Scale=0.85]
+\XeTeXlinebreaklocale "zh"
+\XeTeXlinebreakskip=0pt plus 1pt minus .1pt
+\usepackage[margin=21mm,top=22mm,bottom=23mm,headheight=16pt,headsep=7mm,footskip=11mm]{geometry}
+\usepackage{amsmath,amssymb,mathtools,bm}
+\usepackage{booktabs,longtable,tabularx,array,multirow}
+\usepackage{graphicx,float,caption,subcaption}
+\usepackage{enumitem,listings,etoolbox}
+\usepackage[most]{tcolorbox}
+\usepackage{xcolor,setspace,titlesec,fancyhdr,needspace}
+\definecolor{ink}{HTML}{152E45}
+\definecolor{teal}{HTML}{087F8C}
+\definecolor{rust}{HTML}{A24734}
+\definecolor{softblue}{HTML}{F2F6FA}
+\definecolor{softteal}{HTML}{F0F8F8}
+\definecolor{softwarm}{HTML}{FBF5F0}
+\usepackage[unicode,colorlinks=true,linkcolor=ink,citecolor=teal,urlcolor=teal,bookmarksnumbered=true]{hyperref}
+\usepackage{bookmark}
+\hypersetup{pdftitle={机械臂控制与仿真详细教材},pdfauthor={整合编写},pdfsubject={数学推导 数值算例 图解 七轴柔顺控制},pdfkeywords={机器人,机械臂,控制,辨识,仿真,阻抗,零空间}}
+\renewcommand{\contentsname}{目录}
+\renewcommand{\listfigurename}{图目录}
+\renewcommand{\listtablename}{表目录}
+\renewcommand{\figurename}{图}
+\renewcommand{\tablename}{表}
+\renewcommand{\bibname}{参考资料}
+\renewcommand{\chaptername}{章}
+\renewcommand{\appendixname}{附录}
+\setcounter{tocdepth}{1}
+\setcounter{secnumdepth}{2}
+\makeatletter
+\renewcommand{\@pnumwidth}{2.5em}
+\renewcommand{\@tocrmarg}{3.5em}
+\renewcommand*\l@section{\@dottedtocline{1}{1.5em}{3.4em}}
+\renewcommand*\l@figure{\@dottedtocline{1}{1.5em}{3.4em}}
+\makeatother
+\setstretch{1.25}
+\setlength{\parindent}{2em}
+\setlength{\parskip}{3pt plus 1pt}
+\setlength{\emergencystretch}{2em}
+\renewcommand{\arraystretch}{1.35}
+\setlength{\tabcolsep}{4pt}
+\setlist{itemsep=3pt,topsep=5pt,parsep=1pt,leftmargin=2em}
+\setlist[description]{font=\bfseries}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\titleformat{\chapter}[display]{\sffamily\bfseries\color{black}}{\large 第\thechapter 章}{7pt}{\LARGE}
+\titlespacing*{\chapter}{0pt}{8pt}{20pt}
+\titleformat{\section}{\large\sffamily\bfseries\color{ink}}{\thesection}{.7em}{\phantomsection}
+\titleformat{\subsection}{\normalsize\sffamily\bfseries}{\thesubsection}{.65em}{\phantomsection}
+\titlespacing*{\section}{0pt}{16pt}{7pt}
+\titlespacing*{\subsection}{0pt}{11pt}{5pt}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\sffamily\nouppercase{\leftmark}}
+\fancyfoot[C]{\small\thepage}
+\renewcommand{\headrulewidth}{.35pt}
+\renewcommand{\chaptermark}[1]{\markboth{第\thechapter 章\quad #1}{}}
+\fancypagestyle{plain}{\fancyhf{}\fancyfoot[C]{\small\thepage}\renewcommand{\headrulewidth}{0pt}}
+\captionsetup{font=small,labelfont=bf,skip=7pt,justification=raggedright,singlelinecheck=false}
+\tcbset{enhanced,breakable,boxrule=.5pt,arc=1mm,left=8pt,right=8pt,top=7pt,bottom=7pt,before skip=10pt,after skip=10pt,fonttitle=\sffamily\bfseries,coltitle=ink}
+\newtcolorbox{examplebox}[1][]{colback=softblue,colframe=ink!40,title={#1},colbacktitle=ink!7}
+\newtcolorbox{conceptbox}[1][]{colback=softteal,colframe=teal!45,title={#1},colbacktitle=teal!10}
+\newtcolorbox{pitfallbox}[1][]{colback=softwarm,colframe=rust!45,title={#1},colbacktitle=rust!9}
+\lstset{basicstyle=\ttfamily\small,breaklines=true,breakatwhitespace=false,columns=fullflexible,keepspaces=true,showstringspaces=false,frame=single,rulecolor=\color{ink!25},backgroundcolor=\color{softblue},aboveskip=9pt,belowskip=9pt,framesep=7pt,tabsize=4,keywordstyle=\color{teal}\bfseries,commentstyle=\color{GREY}}
+\definecolor{GREY}{HTML}{53616D}
+\allowdisplaybreaks[2]
+\newcommand{\R}{\mathbb R}
+\newcommand{\diag}{\operatorname{diag}}
+\begin{document}
+\frontmatter
+\input{frontmatter.tex}
+\mainmatter
+\input{chapters/01_math.tex}
+\input{chapters/02_calculus.tex}
+\input{chapters/03_pose.tex}
+\input{chapters/04_kinematics.tex}
+\input{chapters/05_jacobian.tex}
+\input{chapters/06_dynamics.tex}
+\input{chapters/07_actuation.tex}
+\input{chapters/08_identification.tex}
+\input{chapters/09_excitation_friction.tex}
+\input{chapters/10_calibration.tex}
+\input{chapters/11_feedback.tex}
+\input{chapters/12_state_space.tex}
+\input{chapters/13_digital.tex}
+\input{chapters/14_observers.tex}
+\input{chapters/15_impedance.tex}
+\input{chapters/16_operational_space.tex}
+\input{chapters/17_trajectory.tex}
+\input{chapters/18_teaching.tex}
+\input{chapters/19_teleoperation.tex}
+\input{chapters/20_software.tex}
+\input{chapters/21_simulation.tex}
+\input{chapters/22_advanced.tex}
+\input{chapters/23_integration.tex}
+\appendix
+\titleformat{\chapter}[display]{\sffamily\bfseries\color{black}}{\large 附录\thechapter}{7pt}{\LARGE}
+\renewcommand{\chaptermark}[1]{\markboth{附录\thechapter\quad #1}{}}
+\input{appendices.tex}
+\input{reproducibility.tex}
+\backmatter
+\input{references.tex}
+\end{document}

@@ -1,0 +1,240 @@
+\chapter{电机 传动 柔性关节与接触}\label{ch:actuation}
+\section{从电流到关节力矩的完整链条}
+控制程序中的一个力矩数字，最终要经过电机、驱动器和传动系统作用到连杆。理解这条链，可以解释三个常见现象：电流反馈看起来很平滑，末端却有摩擦死区；模型重力已经补偿，关节仍然难拖动；调高刚度后精度改善，但系统开始振动。
+
+对永磁电机，在磁路未饱和且采用相应电流定义时，电机力矩近似为 $\tau_m=K_t i_q$。$K_t$ 是力矩常数，单位 $\mathrm{N\,m/A}$；$i_q$ 是转子坐标系中主要产生力矩的电流。减速比定义为
+\[
+ N=\frac{\dot\theta_m}{\dot q},
+\]
+其中 $\theta_m$ 为电机角，$q$ 为输出关节角。理想无损齿轮满足功率守恒 $\tau_m\dot\theta_m=\tau_j\dot q$，于是 $\tau_j=N\tau_m$。若把传动损失压缩成一个近似效率 $\eta$，在指定驱动方向和工作区间可写
+\begin{equation}
+ \tau_j\approx N\eta K_ti_q=K_{\mathrm{eff}}i_q.
+\end{equation}
+$K_{\mathrm{eff}}$ 是关节侧等效力矩系数。它便于标定，但不应把方向相关摩擦、温度变化和回驱损失都当成一个永远不变的比例。制动、回驱与电机驱动下，简单效率公式也需要重新核对。
+
+\begin{examplebox}[算例 7A 电流换算与模型偏差]
+假设 $N=50$、$K_t=0.08\ \mathrm{N\,m/A}$、该工作点 $\eta=0.85$，反馈电流为 $2\ \mathrm A$。估算关节侧力矩
+\[
+ \tau_j=50\times0.08\times0.85\times2=6.8\ \mathrm{N\,m}.
+\]
+若软件忽略效率，会记录为 $8\ \mathrm{N\,m}$，比这个估算值高 $17.65\%$。辨识算法可能通过放大质量或惯量来“解释”这部分差异，得到力矩预测尚可但物理参数失真的结果。这里的效率仅为教学假设，不是任何实际关节的实测值。
+\end{examplebox}
+
+因此先核对反馈单位和标定链：电流是相电流还是 $q$ 轴电流、峰值还是有效值，输出是电机侧还是关节侧，是否已经乘过减速比。重复乘一次减速比会产生数量级错误。若设备把换算写成 $i\times k\times b\times c$，字母本身没有物理保证，必须查清每个系数的定义、单位及是否随工况改变。
+
+\section{转子惯量为什么乘减速比的平方}
+电机转子的动能为 $T_m=\tfrac12J_m\dot\theta_m^2$，理想刚性齿轮有 $\dot\theta_m=N\dot q$，代入得
+\[
+ T_m=\frac12J_mN^2\dot q^2=\frac12J_{m,\mathrm{out}}\dot q^2,
+ \qquad J_{m,\mathrm{out}}=N^2J_m.
+\]
+这就是把转子惯量折算到关节输出端的公式。若转子速度包含多个关节速度的线性组合，更一般的写法是 $\dot\theta_m=A(q)\dot q$，由此增加的惯量矩阵为 $A^{\mathsf T}J_mA$，未必只是对角线。把 $N^2J_m$ 单独加在每个关节对角线上，是常用的独立传动近似。
+
+\begin{examplebox}[算例 7B 一个很小的转子可以有明显的输出端惯量]
+取转子惯量 $J_m=2\times10^{-5}\ \mathrm{kg\,m^2}$、减速比 $N=100$，则
+\[
+ J_{m,\mathrm{out}}=100^2\times2\times10^{-5}=0.2\ \mathrm{kg\,m^2}.
+\]
+若连杆对该关节的等效惯量是 $0.1\ \mathrm{kg\,m^2}$，总惯量约 $0.3\ \mathrm{kg\,m^2}$。实现 $2\ \mathrm{rad/s^2}$ 加速度所需惯性力矩由 $0.2$ 增至 $0.6\ \mathrm{N\,m}$。只看 CAD 连杆参数会漏掉其中 $0.4\ \mathrm{N\,m}$。
+\end{examplebox}
+
+高减速比有时让对角惯量增加，降低相对耦合程度，但它不会消除耦合，更不能推出“某类机器人必须用某个控制器”。合适方法取决于精度、带宽、摩擦、柔性和可用接口。低减速比也可以使用 PD；高减速比机械臂也可能从模型前馈中获益。
+
+\section{磁场定向控制的必要数学}
+FOC 是 field oriented control，中文为磁场定向控制。它把三相交流电流变换到随转子磁场旋转的坐标系，方便分别控制产生磁场和产生力矩的分量。
+
+\subsection{先把三相投影到平面}
+采用幅值不变的 Clarke 变换，三相电流满足 $i_a+i_b+i_c=0$ 时：
+\begin{equation}
+ \begin{bmatrix}i_\alpha\\i_\beta\end{bmatrix}
+ =\frac23\begin{bmatrix}1&-1/2&-1/2\\0&\sqrt3/2&-\sqrt3/2\end{bmatrix}
+ \begin{bmatrix}i_a\\i_b\\i_c\end{bmatrix}.
+\end{equation}
+然后使用电角度 $\theta_e$ 做 Park 变换：
+\begin{equation}
+ \begin{bmatrix}i_d\\i_q\end{bmatrix}
+ =\begin{bmatrix}\cos\theta_e&\sin\theta_e\\-\sin\theta_e&\cos\theta_e\end{bmatrix}
+ \begin{bmatrix}i_\alpha\\i_\beta\end{bmatrix}.
+\end{equation}
+若极对数为 $p$，则 $\theta_e=p\theta_m+\theta_0$。$\theta_0$ 是编码器机械零点与磁场零点间的偏置。电角度错误会把本想用于出力矩的电流分到错误方向，所以编码器角度正确并不足以证明 FOC 零位正确。
+
+\begin{examplebox}[算例 7C 三相电流怎样变成力矩电流]
+给定 $(i_a,i_b,i_c)=(2,-1,-1)\ \mathrm A$，先得 $(i_\alpha,i_\beta)=(2,0)\ \mathrm A$。若 $\theta_e=-\pi/2$，则
+\[
+ i_d=0\times2+(-1)\times0=0,\qquad
+ i_q=-(-1)\times2+0\times0=2\ \mathrm A.
+\]
+若 $p=7$、永磁磁链 $\psi_f=0.012\ \mathrm{Wb}$，在表贴式永磁电机近似下
+\[
+ \tau_m=\frac32p\psi_f i_q=1.5\times7\times0.012\times2=0.252\ \mathrm{N\,m}.
+\]
+此处 $K_t=0.126\ \mathrm{N\,m/A}$，针对的是上述幅值不变变换下的 $i_q$ 定义，不能不经换算就与其他电流规范的铭牌常数比较。
+\end{examplebox}
+
+\subsection{电压方程与电流环}
+永磁同步电机的一种常用 $dq$ 模型为
+\begin{align}
+ v_d&=R_si_d+L_d\dot i_d-\omega_eL_qi_q,\\
+ v_q&=R_si_q+L_q\dot i_q+\omega_e(L_di_d+\psi_f).
+\end{align}
+$R_s$ 是定子电阻，$L_d,L_q$ 是两轴电感，$\omega_e$ 是电角速度。交叉项描述旋转坐标的耦合，$\omega_e\psi_f$ 是反电动势。一般力矩还包括磁阻项：
+\begin{equation}
+ \tau_m=\frac32p\left[\psi_fi_q+(L_d-L_q)i_di_q\right].
+\end{equation}
+当 $L_d\approx L_q$ 或 $i_d=0$，才退化为前面简单的 $K_t i_q$。
+
+若用前馈补偿交叉项，且只分析局部电流环，可近似 $G(s)=1/(Ls+R_s)$。PI 控制器 $K_p+K_i/s$ 的零点放在 $-R_s/L$，并指定闭环带宽 $\omega_c$，有
+\[
+ K_p=L\omega_c,\qquad K_i=R_s\omega_c.
+\]
+推导是 $C(s)G(s)=\omega_c/s$，因此闭环 $CG/(1+CG)=\omega_c/(s+\omega_c)$。这依赖于模型准确、没有饱和以及可忽略延迟，不能把它当作真实驱动器的无条件整定公式。
+
+\begin{examplebox}[算例 7D 电流 PI 的单位与数值]
+取 $L=0.5\ \mathrm{mH}=0.0005\ \mathrm H$，$R_s=0.5\ \Omega$，希望局部一阶近似带宽为 $1000\ \mathrm{Hz}$，则 $\omega_c=2\pi\times1000=6283.19\ \mathrm{rad/s}$。
+\[
+ K_p=3.14159\ \mathrm{V/A},\qquad K_i=3141.59\ \mathrm{V/(A\,s)}.
+\]
+若采样或 PWM 更新带来延迟，这个闭环模型就会改变。实际可实现带宽必须结合开关频率、采样方式、计算延迟和相位裕度分析。
+\end{examplebox}
+
+\section{刚性齿轮假设失效后会发生什么}
+\subsection{把电机与负载看作两个惯量}
+选择同一个输出端角度单位，令 $\theta$ 是电机角折算到输出端后的角度，$q$ 是连杆角。两者之间用扭簧和阻尼连接：
+\begin{align}
+ J_m^{\prime}\ddot\theta+d_s(\dot\theta-\dot q)+k_s(\theta-q)&=\tau_m^{\prime},\\
+ J_l\ddot q-d_s(\dot\theta-\dot q)-k_s(\theta-q)&=-\tau_L.
+\end{align}
+$J_m^{\prime}$、$\tau_m^{\prime}$ 都已折算到输出端，不能再额外乘一次 $N$。$k_s$ 单位是 $\mathrm{N\,m/rad}$，表示扭转刚度；$d_s$ 单位是 $\mathrm{N\,m\,s/rad}$；$\tau_L$ 是外部负载阻力矩。
+
+静止时有 $\theta-q=\tau_L/k_s$。电机编码器显示到位，负载仍可因为弹性而偏离。这也是在力矩精度和输出位置精度之间，双编码器比单电机编码器多提供了什么信息。
+
+\begin{examplebox}[算例 7E 编码器到位与末端到位]
+若 $k_s=500\ \mathrm{N\,m/rad}$、负载力矩 $\tau_L=5\ \mathrm{N\,m}$，则扭转角 $0.01\ \mathrm{rad}=0.573^\circ$。若这一角误差作用在 $0.5\ \mathrm m$ 力臂上，末端小角度位移约 $0.5\times0.01=0.005\ \mathrm m$，即 $5\ \mathrm{mm}$。仅提高电机角度显示精度无法消除这个结构误差。
+\end{examplebox}
+
+\subsection{推导谐振与反谐振频率}
+先令阻尼和外负载为零，采用零初始条件。将电机侧角度、负载侧角度与输入力矩的拉普拉斯变换分别记为 $\Theta(s)$、$Q(s)$、$\mathcal T(s)$，有：
+\[
+ (J_m^{\prime}s^2+k_s)\Theta-k_sQ=\mathcal T,\qquad
+ -k_s\Theta+(J_ls^2+k_s)Q=0.
+\]
+由第二式 $Q=k_s\Theta/(J_ls^2+k_s)$，代回第一式，得
+\begin{equation}
+ \frac{s\Theta(s)}{\mathcal T(s)}
+ =\frac{J_ls^2+k_s}{s[J_m^{\prime}J_ls^2+k_s(J_m^{\prime}+J_l)]}.
+\end{equation}
+分子为零对应电机侧速度响应的反谐振：
+\[
+ \omega_{ar}=\sqrt{k_s/J_l}.
+\]
+非零振荡极点对应谐振：
+\[
+ \omega_r=\sqrt{k_s(1/J_m^{\prime}+1/J_l)}.
+\]
+反谐振位置与测量输出有关：如果改看负载侧角速度，传递函数的分子不同，不能把电机侧的“谷”机械地套过去。
+
+\begin{figure}[htbp]\centering
+\includegraphics[width=0.90\linewidth]{figures/di_flexible_response.pdf}
+\caption{双惯量系统的电机侧和负载侧速度响应。曲线加入小扭转阻尼使峰值有限；竖线标出无阻尼公式预测的特征频率。}
+\end{figure}
+
+取输出端电机惯量 $J_m^{\prime}=0.05\ \mathrm{kg\,m^2}$，负载惯量 $J_l=0.2\ \mathrm{kg\,m^2}$，扭转刚度 $k_s=5000\ \mathrm{N\,m/rad}$。分别得到
+\[
+ \omega_{ar}=158.114\ \mathrm{rad/s},\quad f_{ar}=25.16\ \mathrm{Hz},
+\]
+\[
+ \omega_r=353.553\ \mathrm{rad/s},\quad f_r=56.27\ \mathrm{Hz}.
+\]
+这些频率由惯量和刚度共同决定。只要控制或轨迹在相关频段输入能量，就可能激起振动。
+
+\section{接触以后 外力由约束共同决定}
+\subsection{刚性接触的互补条件}
+设 $\phi(q)$ 是机器人与环境的间隙，$\phi>0$ 表示分离，$\phi=0$ 表示贴合。理想无黏附单侧接触要求
+\begin{equation}
+ \phi\ge0,\qquad\lambda_n\ge0,\qquad\phi\lambda_n=0.
+\end{equation}
+$\lambda_n$ 为环境对机器人的法向压力。三个条件分别表示：不穿透、接触只能推不能拉、分离时没有接触力。这称为互补条件。它不是“力恒等于刚度乘位移”，因为理想刚性接触不允许压缩量。
+
+动态方程增加 $J_c^{\mathsf T}\lambda$：
+\[
+ M\ddot q+c+g=\tau_{\mathrm{cmd}}+J_c^{\mathsf T}\lambda.
+\]
+若接触保持不动，还需满足 $J_c\ddot q+\dot J_c\dot q=0$。动力学与约束共同决定加速度和接触力；不能先随便给一个法向力，再期望它自动与运动一致。
+
+\subsection{柔性接触与不能出现拉力的修正}
+令穿透量 $\delta=\max(0,-\phi)$。简单弹簧阻尼模型在接触区采用
+\[
+ \lambda_n=\max(0,k_c\delta+d_c\dot\delta).
+\]
+$k_c$ 是接触刚度，$d_c$ 是接触阻尼。外层最大值防止卸载时出现非物理拉力，但切换本身可能带来不光滑。更复杂的材料模型可让阻尼随压缩量变化；无论选哪种，参数都需要与材料、接触形状和积分算法相匹配。
+
+\begin{examplebox}[算例 7F 接触刚度决定很小位移对应多大力]
+取 $k_c=20000\ \mathrm{N/m}$，压入 $0.5\ \mathrm{mm}=0.0005\ \mathrm m$，静态接触力为 $10\ \mathrm N$。如果目标是 $5\ \mathrm N$，理想静态压缩量仅为 $5/20000=0.25\ \mathrm{mm}$。这说明硬接触中，小位置误差也能产生明显力误差。
+\end{examplebox}
+
+\subsection{摩擦锥说明夹持能力}
+接触切向摩擦满足 $\|\lambda_t\|\le\mu\lambda_n$。$\mu$ 是无量纲摩擦系数，静止时摩擦力可处于边界内部，恰好平衡需要抵抗的切向力；滑动时，在理想库仑模型下摩擦位于边界且反向于滑动速度。
+
+\begin{figure}[htbp]\centering
+\includegraphics[width=0.90\linewidth]{figures/di_contact_friction.pdf}
+\caption{左图为单侧弹簧接触的力与间隙关系。右图为二维切向截面中的摩擦锥，锥内的接触力可满足无滑动摩擦约束。}
+\end{figure}
+
+“夹爪夹持力 $20\ \mathrm N$”可能指每个手指的法向力，也可能指一对手指的合计指标，必须先核对。若每个接触面均为 $20\ \mathrm N$、两个接触面、$\mu=0.6$，最大静态切向支撑力是 $2\times0.6\times20=24\ \mathrm N$，对应重力质量 $24/9.81=2.45\ \mathrm{kg}$。这是理想静态极限，尚未计入加速度、接触不均匀和实际摩擦变化。
+
+\subsection{撞击用冲量计算}
+极短时间内，接触力很大而持续时间很短，直接研究冲量 $\Lambda=\int\lambda\,dt$ 更方便。忽略冲击时刻其他有限力矩的积分，得到
+\[
+ M(\dot q^+-\dot q^-)=J_n^{\mathsf T}\Lambda,
+\]
+$-$、$+$ 分别表示撞击前后。静止环境下的法向恢复规律为 $v_n^+=-e_r v_n^-$，$e_r\in[0,1]$ 是恢复系数。于是
+\begin{equation}
+ \Lambda=-\frac{(1+e_r)v_n^-}{J_nM^{-1}J_n^{\mathsf T}}.
+\end{equation}
+分母的倒数 $m_{\mathrm{eff}}=(J_nM^{-1}J_n^{\mathsf T})^{-1}$ 称为该接触方向的有效质量。它取决于机械臂姿态和接触方向，并不等于所有连杆质量简单相加。
+
+\begin{examplebox}[算例 7G 两连杆撞到水平面时的有效质量]
+沿用本书两杆模型，$q=(0,\pi/2)$，法向取正 $y$，所以 $J_n=(0.5,0)$。此时
+\[
+ M^{-1}=\begin{bmatrix}3&-3\\-3&15\end{bmatrix},\qquad
+ J_nM^{-1}J_n^{\mathsf T}=0.75,
+\]
+从而 $m_{\mathrm{eff}}=1.33333\ \mathrm{kg}$。若撞前法向速度 $-0.2\ \mathrm{m/s}$，$e_r=0.1$，则
+\[
+ \Lambda=\frac{1.1\times0.2}{0.75}=0.293333\ \mathrm{N\,s}.
+\]
+关节速度改变量为 $M^{-1}J_n^{\mathsf T}\Lambda=(0.44,-0.44)^{\mathsf T}\ \mathrm{rad/s}$，末端法向速度增加 $0.5\times0.44=0.22\ \mathrm{m/s}$，因此撞后速度是 $0.02\ \mathrm{m/s}$，恰好等于 $-0.1\times(-0.2)$。
+\end{examplebox}
+
+\section{持续力矩与热比峰值力矩更容易被忽略}
+电机铜耗与电流平方近似成正比，所以周期工况常用电流有效值 $i_{\mathrm{rms}}=\sqrt{\frac1T\int_0^T i^2dt}$ 估计发热，而不是用平均电流。对举着相机的机械臂，静止时速度为零、机械输出功率 $\tau\dot q$ 为零，电流仍然产生铜耗。这解释了“没有动却越来越热”。
+
+\begin{examplebox}[算例 7H 平均电流为零仍然发热]
+前半周期 $i=3\ \mathrm A$，后半周期 $i=-3\ \mathrm A$，平均值为零，但 $i_{\mathrm{rms}}=3\ \mathrm A$。若等效电阻 $0.4\ \Omega$，相应电阻损耗量级为 $i_{\mathrm{rms}}^2R=3.6\ \mathrm W$。多相电机的总铜耗还需按实际电流定义和相数计算，不能把这个单等效电阻示例直接当成总电机损耗。
+\end{examplebox}
+
+减速器选型和电机选型应围绕实际工况：持载时的连续力矩、加速时的短时峰值、可允许的温升、弹性变形和传动损失。本书不会从一个型号类别直接推断可反驱性或力控精度；这些都应由实际关节测量确认。
+
+\section{计算练习与分步解答}
+\subsection*{练习 7.1 改变减速比后的惯量}
+转子惯量 $10^{-5}\ \mathrm{kg\,m^2}$，减速比由 $50$ 改为 $80$，求输出端转子惯量的变化倍数。
+
+\textbf{解答。}原来是 $50^2\times10^{-5}=0.025$，后来是 $80^2\times10^{-5}=0.064\ \mathrm{kg\,m^2}$，倍数 $0.064/0.025=2.56$。力矩放大只与 $N$ 一次方相关，惯量放大与 $N^2$ 相关，因此提高减速比不只带来更大的输出力矩。
+
+\subsection*{练习 7.2 从双编码器估计扭转力矩}
+输出端角为 $0.500\ \mathrm{rad}$，电机角折算到输出端为 $0.506\ \mathrm{rad}$，扭转刚度 $800\ \mathrm{N\,m/rad}$，忽略阻尼。求弹性传递力矩。
+
+\textbf{解答。}角差为 $0.006\ \mathrm{rad}$，力矩 $800\times0.006=4.8\ \mathrm{N\,m}$。若两个编码器的相对零偏为 $0.001\ \mathrm{rad}$，就会产生 $0.8\ \mathrm{N\,m}$ 的估计偏置，因此双编码器方法同样需要零偏和刚度标定。
+
+\subsection*{练习 7.3 接触自然频率}
+有效质量 $2\ \mathrm{kg}$，接触刚度 $80000\ \mathrm{N/m}$，求无阻尼自然频率。
+
+\textbf{解答。}$\omega_n=\sqrt{k/m}=\sqrt{40000}=200\ \mathrm{rad/s}$；$f_n=200/(2\pi)=31.83\ \mathrm{Hz}$，周期约 $31.4\ \mathrm{ms}$。积分步长与控制周期如何选择还取决于阻尼、积分方法和延迟，不能仅凭“采样比两倍频率快”就保证接触仿真和闭环稳定。
+
+\subsection*{练习 7.4 静态夹持与向上加速}
+两个指面各提供 $15\ \mathrm N$ 法向力，$\mu=0.5$。若物体要向上加速 $2\ \mathrm{m/s^2}$，理想最大质量是多少？
+
+\textbf{解答。}总可用向上摩擦力为 $2\times15\times0.5=15\ \mathrm N$。牛顿方程要求 $F=m(g_0+a)$，因此 $m=15/(9.81+2)=1.270\ \mathrm{kg}$。静止时则为 $15/9.81=1.529\ \mathrm{kg}$。加速需求会直接消耗静态夹持余量。
+
+\section*{本章与原稿的对应}
+本章整合 [A，第33页与35--38页] 及 [B，第33页、第37--40页与116--120页]。补充了惯量折算的动能推导、明确坐标侧的双惯量模型、FOC 变换与力矩系数约定、有效质量和撞击的完整数值计算。通信和软件层面的执行链在工程实现章节继续。

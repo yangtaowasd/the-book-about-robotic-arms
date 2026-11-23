@@ -1,0 +1,116 @@
+\chapter{配套程序与复现说明}
+\label{app:reproduce}
+
+本书同时提供可编辑的 \LaTeX{} 正文、全部图形的生成脚本、数值校核脚本和第23章合成数据。PDF 本身包含推导、算例、练习和解答；配套程序用于把数字与曲线重新算出来，并在改变条件后观察结果。所有程序都只进行本地数学计算或作图，不连接机器人。
+
+\section{文件怎样对应正文}
+
+解压配套压缩包后，进入 \texttt{robotics\_textbook} 目录。正文入口为 \texttt{textbook.tex}，23章位于 \texttt{chapters/}，矢量图与 PNG 位于 \texttt{figures/}。下表按学习用途列出程序。
+
+\begin{longtable}{>{\raggedright\arraybackslash}p{61mm}>{\raggedright\arraybackslash}p{90mm}}
+\toprule 文件 & 内容与输出\\\midrule\endhead
+\texttt{math\_checks.py} & 第1--5章的矩阵、几何、运动学与数值方法检查；输出 \texttt{math\_check\_results.json}\\
+\texttt{dynamics\_checks.py} & 第6--10章的动力学、辨识和标定计算；输出 \texttt{dynamics\_numbers.json}\\
+\texttt{control\_checks.py} & 第11--16章的反馈、离散模型、估计与操作空间核对；输出 \texttt{control\_numbers.json}\\
+\texttt{math\_figures.py}\newline\texttt{dynamics\_figures.py}\newline\texttt{control\_figures.py} & 生成前三组章节的精确几何图与数值曲线\\
+\texttt{root\_figures.py} & 第17--23章的轨迹、示教、时序、MPC和云台图；还输出 \texttt{root\_numeric\_checks.json}\\
+\texttt{integrated\_experiment.py} & 第23章完整2R辨识及控制实验；生成数据、结果、图和教材中的指标表\\
+\texttt{integration\_data.npz} & 合成训练和验证数据，不是真机日志\\
+\texttt{integration\_results.json} & 参数、仿真设定、验证残差和四控制器指标\\
+\texttt{README.txt} & 运行顺序、依赖和源文件说明\\
+\bottomrule
+\end{longtable}
+
+\section{最小运行顺序}
+
+数值程序使用 Python 3，以及 NumPy、SciPy、SymPy、Matplotlib。中文作图需要 Noto CJK 字体；若系统缺少该字体，可安装字体或在脚本中改成已有的中文字体。编译正文需要支持中文字体的 XeLaTeX 和完整的常用宏包。配套的 PDF 图已经生成，因此只编译正文时无需重新运行全部作图程序。
+
+\begin{lstlisting}[language=bash]
+python math_checks.py
+python dynamics_checks.py
+python control_checks.py
+python integrated_experiment.py
+
+# Optional: regenerate the remaining figures.
+python math_figures.py
+python dynamics_figures.py
+python control_figures.py
+python root_figures.py
+
+# Compile twice for the contents, labels and references.
+xelatex textbook.tex
+xelatex textbook.tex
+\end{lstlisting}
+
+不同平台的浮点库和字体可能造成极小数字差异或分页差异。判断计算一致性时，比较合理数值容差、物理关系和曲线形状；不要用 PDF 文件字节是否完全相同来判断算法是否正确。
+
+\section{第23章实验实际做了什么}
+
+实验对象是二维竖直平面两连杆，使用第6章推导的显式刚体方程。程序以四阶 Runge--Kutta 推进关节状态，并在每个积分阶段使用执行器一阶方程的解析力矩值；控制命令每隔多个物理步更新一次，另保留一个控制周期的命令延迟。
+
+\begin{enumerate}
+\item 用解析激励轨迹产生 $q,\dot q,\ddot q$；以独立的对象真值生成合成力矩，再加入固定随机种子的噪声。
+\item 按两个质量和四个摩擦系数构造六列回归矩阵；用最小二乘估计，不把真值直接传给辨识控制器。
+\item 使用另一条轨迹和另一组噪声计算验证残差。报告包含测量噪声的误差，同时在结果文件中保留对无噪声对象的误差。
+\item 对相同的起终点、三秒五次轨迹、一秒保持、反馈增益和执行器设定，分别运行四个控制器。
+\item 从关节状态计算末端实际位置，统计零至四秒的误差。RMS 是二维误差向量模长的均方根，终点误差是四秒时的误差。
+\end{enumerate}
+
+本实验没有调用 MuJoCo，也没有调用 NERO 驱动。第21章的 MJCF 是用于解释结构的模型示例；软件接口的讲解和本次实际执行的仿真要分别理解。这里还没有模拟编码器噪声、真实静摩擦集合、齿隙、连杆柔性、网络随机抖动或接触。加上这些因素后，性能指标应重新计算，而不能沿用第23章的数字。
+
+\section{怎样自己改一个条件并解释结果}
+
+推荐一次只改一个明确因素。例如先保持模型和增益不变，把控制周期从 $5\,\mathrm{ms}$ 改为 $10\,\mathrm{ms}$，同时确保物理步仍为 $0.5\,\mathrm{ms}$，则更新步数应从10变为20。若仍保留“一控制周期延迟”，通信延迟也同时从5毫秒变为10毫秒；这实际上改变了两个物理量。为了只研究采样率，应把延迟单独固定，并明确新的队列实现。
+
+再如只把重力补偿的质量改错，并比较静态误差与 $K^{-1}F_r$ 的近似；只加大工具质量，检查力矩余量和轨迹误差；只改变零空间增益，观察主任务是否因限幅或正则化发生耦合。每次先写预测，再运行，再用方程解释差异。
+
+最后，为每张新增曲线写下对象参数、控制律、初始状态、采样周期、积分步长、时延、限幅、评价区间和单位。这样的记录能让一次仿真成为可以讨论和复核的证据。
+
+\section{一个可独立运行的2R核对片段}
+
+下面的最小代码复现名义模型在 $q=(0,\pi/2)$ 的 $J,M,g$，并验证速度和力映射的功率相等。它不依赖任何机器人工具箱。
+
+\begingroup
+\setstretch{1.0}
+\begin{lstlisting}[language=Python]
+import numpy as np
+
+q1, q2 = 0.0, np.pi / 2
+l1 = l2 = 0.5
+c1 = c2 = 0.25
+m1 = m2 = 1.0
+I1 = I2 = 1.0 / 48.0
+g0 = 9.81
+
+J = np.array([
+    [-l1*np.sin(q1)-l2*np.sin(q1+q2),
+     -l2*np.sin(q1+q2)],
+    [ l1*np.cos(q1)+l2*np.cos(q1+q2),
+      l2*np.cos(q1+q2)]
+])
+a = I1+I2+m1*c1**2+m2*(l1**2+c2**2)
+b = m2*l1*c2
+d = I2+m2*c2**2
+M = np.array([
+    [a+2*b*np.cos(q2), d+b*np.cos(q2)],
+    [d+b*np.cos(q2), d]
+])
+g = g0*np.array([
+    (m1*c1+m2*l1)*np.cos(q1)
+    + m2*c2*np.cos(q1+q2),
+    m2*c2*np.cos(q1+q2)
+])
+
+v = np.array([0.0, 0.1])
+f = np.array([2.0, -3.0])
+qd = np.linalg.solve(J, v)
+tau_ext = J.T @ f
+assert np.allclose(qd, [0.2, -0.2])
+assert np.allclose(tau_ext, [-2.5, -1.0])
+assert np.allclose(qd @ tau_ext, v @ f)
+assert np.all(np.linalg.eigvalsh(M) > 0)
+print(J, M, g, qd @ tau_ext, sep="\n")
+\end{lstlisting}
+\endgroup
+
+这一检查只证明这些量在本模型和本姿态下自洽。它不会替代完整参数核验，也不能证明控制器在任意轨迹、延迟和接触条件下稳定。应把每个检查的结论限定在实际覆盖的范围。

@@ -1,0 +1,104 @@
+{
+  "model": "Educational vertical-plane 2R; no hardware measurements; explicit ODE RK4",
+  "parameter_order": [
+    "m1_kg",
+    "m2_kg",
+    "Fc1_Nm",
+    "b1_Nms_rad",
+    "Fc2_Nm",
+    "b2_Nms_rad"
+  ],
+  "truth_parameters": [
+    1.1,
+    0.9,
+    0.15,
+    0.08,
+    0.1,
+    0.05
+  ],
+  "identified_parameters": [
+    1.0999165940821536,
+    0.899932084165689,
+    0.14998595345854435,
+    0.07984755766611397,
+    0.10172686759448293,
+    0.04637480196445466
+  ],
+  "training_samples": 3000,
+  "noise_sigma_Nm": 0.02,
+  "validation_rmse_Nm": [
+    0.02031735743076065,
+    0.01991531025534512
+  ],
+  "validation_clean_rmse_Nm": [
+    0.0006144208970083344,
+    0.0008170867272108703
+  ],
+  "raw_design_condition": 47.80365201470303,
+  "mass_matrix_and_power_checks": "passed",
+  "time_step_s": 0.0005,
+  "control_period_s": 0.005,
+  "actuator_time_constant_s": 0.004,
+  "actuator_integration": "Exact exponential torque at RK4 stages 0, h/2, h under the held delayed command",
+  "metric_sampling_hz": 200,
+  "metric_record_count": 801,
+  "metric_interval_s": [
+    0.0,
+    4.0
+  ],
+  "final_error_time_s": 4.0,
+  "saturation_control_evaluations": 800,
+  "saturation_count_definition": "Number of control evaluations before t=4 s with at least one clipped joint command",
+  "known_friction_smoothing_speed_rad_s": 0.02,
+  "one_control_period_command_delay": true,
+  "initial_actuator_torque_Nm": [
+    0,
+    0
+  ],
+  "torque_limits_Nm": [
+    15.0,
+    6.0
+  ],
+  "metrics": {
+    "pd": {
+      "rms_mm": 140.19049849539206,
+      "max_mm": 212.0877043350425,
+      "final_mm": 56.60294970910363,
+      "peak_torque": [
+        8.139728288346113,
+        1.118687856040938
+      ],
+      "saturated_control_samples": 0
+    },
+    "gravity": {
+      "rms_mm": 3.051800404349578,
+      "max_mm": 5.745072574644998,
+      "final_mm": 3.8609396514468886,
+      "peak_torque": [
+        8.648977456615446,
+        1.265159810323928
+      ],
+      "saturated_control_samples": 0
+    },
+    "nominal": {
+      "rms_mm": 5.728954019841522,
+      "max_mm": 7.639699741252061,
+      "final_mm": 6.890025935704396,
+      "peak_torque": [
+        8.65973804880358,
+        1.2278396993942808
+      ],
+      "saturated_control_samples": 0
+    },
+    "identified": {
+      "rms_mm": 1.4141767363220268,
+      "max_mm": 3.952441390707385,
+      "final_mm": 0.11743292723243161,
+      "peak_torque": [
+        8.4556398710501,
+        1.2465515677495531
+      ],
+      "saturated_control_samples": 0
+    }
+  }
+}

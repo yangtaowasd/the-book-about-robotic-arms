@@ -1,0 +1,294 @@
+\chapter{雅可比 奇异性和七轴的运动学零空间}\label{ch:jacobian}
+\section{雅可比的每一列是一种关节单独运动}
+正运动学描述有限位置关系 $p=f(q)$。让一个关节微小运动、其他关节固定，端点的变化率就是关于该关节的偏导数。把所有列排在一起：
+\begin{equation}
+ J_p(q)=\frac{\partial p}{\partial q}
+ =\begin{bmatrix}
+ \partial p_x/\partial q_1&\cdots&\partial p_x/\partial q_n\\
+ \partial p_y/\partial q_1&\cdots&\partial p_y/\partial q_n\\
+ \partial p_z/\partial q_1&\cdots&\partial p_z/\partial q_n
+ \end{bmatrix},
+ \qquad\dot p=J_p(q)\dot q.
+\end{equation}
+位置雅可比 $J_p$ 的输出是指定点的线速度。六维几何雅可比则把同一点线速度与刚体角速度堆叠：
+\begin{equation}
+ \begin{bmatrix}\dot p\\\omega\end{bmatrix}
+ =\begin{bmatrix}J_p\\J_\omega\end{bmatrix}\dot q
+ =J_g(q)\dot q.
+\end{equation}
+角速度不是任意三个姿态参数的导数。若用欧拉角作为输出坐标，对应的解析雅可比需要乘入第~\ref{ch:pose}~章的姿态参数变换；不能把它与几何雅可比混用。
+
+\section{两连杆雅可比逐项推导}
+对式~\eqref{eq:two_r_fk} 求偏导。$q_1$ 同时改变第一杆和第二杆绝对朝向，$q_2$ 只改变第二杆，因此
+\begin{align}
+ \frac{\partial x}{\partial q_1}&=-l_1\sin q_1-l_2\sin(q_1+q_2),
+ &\frac{\partial x}{\partial q_2}&=-l_2\sin(q_1+q_2),\\
+ \frac{\partial y}{\partial q_1}&=l_1\cos q_1+l_2\cos(q_1+q_2),
+ &\frac{\partial y}{\partial q_2}&=l_2\cos(q_1+q_2).
+\end{align}
+故平面位置雅可比为
+\begin{equation}
+ J_p=\begin{bmatrix}
+ -l_1s_1-l_2s_{12}&-l_2s_{12}\\
+ l_1c_1+l_2c_{12}&l_2c_{12}
+ \end{bmatrix},
+\end{equation}
+其中 $s_1=\sin q_1$、$s_{12}=\sin(q_1+q_2)$，余弦缩写同理。平面末端角速度是 $\dot\theta_e=\dot q_1+\dot q_2$，因此若包含朝向，第三行是 $(1,1)$。这时 $J_g$ 为 $3\times2$，无法完成任意三维平面位姿速度。
+
+\begin{examplebox}[算例 末端向上 为什么两个关节都要动]
+在 $q=(0,\pi/2)$，位置雅可比为 $J=\begin{bmatrix}-0.5&-0.5\\0.5&0\end{bmatrix}$。要求 $v=(0,0.1)^\mathsf T\,\mathrm{m/s}$，第二行给出 $\dot q_1=0.2\,\mathrm{rad/s}$；第一行要求 $\dot q_1+\dot q_2=0$，所以 $\dot q_2=-0.2\,\mathrm{rad/s}$。
+第一关节单独正转会让端点同时向左和向上；第二关节负转补回向左的部分，因此最终只向上。这是几何耦合，不是控制器必须逐轴独立的理由。
+\end{examplebox}
+
+\subsection{加速度为什么多出一项}
+对 $\dot p=J\dot q$ 求导：
+\begin{equation}
+ \ddot p=J\ddot q+\dot J\dot q.
+\end{equation}
+在上例中，保持 $\dot q=(0.2,-0.2)^\mathsf T$、$\ddot q=0$。第二杆绝对角速度为零，第一杆却仍绕基座作圆周运动，故
+\[
+ \ddot p=-l_1\dot q_1^2(\cos q_1,\sin q_1)^\mathsf T
+ =(-0.02,0)^\mathsf T\,\mathrm{m/s^2}.
+\]
+这正是 $\dot J\dot q$。如果要在有限时间内让末端沿直线匀速上移，关节速度必须随姿态更新，不能一直使用初始的两个常数速度。
+
+\section{三维几何构造比手工求偏导更直观}
+设第 $i$ 个旋转关节轴在基座中方向为单位向量 $z_i$，轴上参考点为 $p_i$，工具点为 $p_e$。刚体绕轴角速度为 $z_i\dot q_i$ 时，工具点速度为
+\[
+ \dot p_e=(z_i\dot q_i)\times(p_e-p_i).
+\]
+所以雅可比第 $i$ 列为
+\begin{equation}
+ J_{g,i}=\begin{bmatrix}z_i\times(p_e-p_i)\\z_i\end{bmatrix}
+ \quad\text{旋转关节};\qquad
+ J_{g,i}=\begin{bmatrix}z_i\\0\end{bmatrix}
+ \quad\text{移动关节}.
+\end{equation}
+所有轴和位置必须先表达在同一坐标系。把“关节轴在局部的 $(0,0,1)$”未经变换直接代入基座点坐标，是常见错误。
+
+若工具相对法兰有当前基座表达的偏移 $r$，则 $p_t=p_f+r$、$\dot r=\omega\times r$，因此
+\begin{equation}
+ J_{p,t}=J_{p,f}-\widehat rJ_\omega,
+ \qquad J_{\omega,t}=J_{\omega,f}.
+\end{equation}
+同一刚体上不同点具有相同角速度，却一般有不同线速度。长工具尤其容易放大姿态变化造成的位置变化。
+
+\section{雅可比转置从功率相等推出来}
+力 $f$ 和力矩 $m$ 均为环境施加在工具上的量，且与几何速度使用同一坐标系、同一作用参考点，记 $F=(f,m)$。关节力矩记为 $\tau_{\rm ext}$。理想刚性无损几何传动中，任意瞬间的功率应相同：
+\begin{equation}
+ F^\mathsf T V=\tau_{\rm ext}^\mathsf T\dot q.
+\end{equation}
+代入 $V=J_g\dot q$，得到 $F^\mathsf TJ_g\dot q=\tau_{\rm ext}^\mathsf T\dot q$。因为对任意 $\dot q$ 都应成立，所以
+\begin{equation}\label{eq:jac_force}
+ \tau_{\rm ext}=J_g^\mathsf TF.
+\end{equation}
+这不是把速度式中的 $J$ 随意转置，而是由功率对偶关系决定。若要讨论机器人对环境的力，符号与环境对机器人的力相反，应先明确作用反作用的定义。
+
+\begin{examplebox}[算例 验证末端功率与关节功率完全一致]
+仍取标准两连杆姿态，末端受力 $f=(5,10)^\mathsf T\,\mathrm N$。由
+\[
+ \tau_{\rm ext}=\begin{bmatrix}-0.5&0.5\\-0.5&0\end{bmatrix}
+ \begin{bmatrix}5\\10\end{bmatrix}
+ =\begin{bmatrix}2.5\\-2.5\end{bmatrix}\mathrm{N\,m}.
+\]
+若关节速度为 $(0.2,-0.2)^\mathsf T\,\mathrm{rad/s}$，关节功率为 $2.5\times0.2+(-2.5)(-0.2)=1\,\mathrm W$。末端速度为 $(0,0.1)$，末端功率为 $5\times0+10\times0.1=1\,\mathrm W$。两侧一致，符号和转置方向得到核对。
+\end{examplebox}
+
+反过来用关节外力矩估计末端力，求解的是 $J^\mathsf TF\approx\tau_{\rm ext}$。只有在适当秩条件和接触假设下才有唯一解释。多点接触、模型偏差、摩擦和传感器零偏都可能产生相似关节力矩，不能把一次伪逆运算就称为“准确的六维力传感器”。
+
+\section{奇异位形究竟失去了什么}
+\subsection{两连杆的行列式逐项化简}
+对平面位置雅可比，
+\begin{align}
+ \det J
+ &=(-l_1s_1-l_2s_{12})(l_2c_{12})
+  -(-l_2s_{12})(l_1c_1+l_2c_{12})\\
+ &=l_1l_2(s_{12}c_1-s_1c_{12})
+ =l_1l_2\sin q_2.
+\end{align}
+当 $q_2=0$ 或 $\pi$，秩下降。在 $q_1=q_2=0$ 的完全伸直状态，
+\begin{equation}
+ J=\begin{bmatrix}0&0\\1&0.5\end{bmatrix}.
+\end{equation}
+无论关节速度怎么选，瞬时 $x$ 方向速度都为零。沿 $y$ 的运动仍然存在，所以奇异不等于“整台机械臂完全不能动”。它表示所选任务的局部速度映射丢失独立方向。
+
+\begin{examplebox}[算例 靠近奇异时关节速度迅速增大]
+取 $q_1=0$、$q_2=0.01\,\mathrm{rad}$，要求末端 $v=(0.1,0)^\mathsf T\,\mathrm{m/s}$。求解两行线性方程得到
+\[
+ \dot q_1=0.2\cot q_2\approx19.9993\,\mathrm{rad/s},
+ \qquad
+ \dot q_2=-\frac{0.2(1+\cos q_2)}{\sin q_2}
+ \approx-39.9997\,\mathrm{rad/s}.
+\]
+同样的 $0.1\,\mathrm{m/s}$ 目标，在 $q_2=90^\circ$ 时只需 $(0,-0.2)^\mathsf T\,\mathrm{rad/s}$。危险来自映射在指定方向上的放大，而不只是目标速度本身“大”。
+\end{examplebox}
+
+\begin{figure}[htbp]
+\centering\includegraphics[width=0.9\linewidth]{figures/mk_singularity.pdf}
+\caption{从屈肘到接近伸直，速度椭圆变得越来越扁。右图显示本例最小奇异值随肘角接近零而下降；某些方向所需的关节速度随之放大。}
+\end{figure}
+
+在理想刚性模型中，奇异方向的某些外力可沿结构传递而不产生相应关节广义力；这不表示真实机构能够承受无限载荷。连杆弯曲、轴承、减速器和底座都有有限强度与柔性。任务可操作性指标不能替代结构载荷判断。
+
+\subsection{奇异值 条件数和可操作度不是同一个目标}
+若 $J\in\mathbb R^{m\times n}$ 满行秩，速度单位球映射成椭球。最小奇异值 $\sigma_{\min}$ 描述最弱方向的速度换算，条件数 $\sigma_{\max}/\sigma_{\min}$ 描述各方向不均衡程度，可操作度（manipulability）
+\begin{equation}
+ w(q)=\sqrt{\det(JJ^\mathsf T)}=\prod_{i=1}^m\sigma_i
+\end{equation}
+与椭球体积成正比。它们都需要先固定单位、任务尺度及关节速度度量。
+
+对本书等长两连杆的二维位置任务，$w=0.25|\sin q_2|$，在 $q_2=\pm90^\circ$ 时最大。但这并不等于条件数最小：$q_2=90^\circ$ 时条件数约为 2.618；$\cos q_2=-2/3$，即 $q_2\approx131.810^\circ$ 时条件数约为 1.618。前者追求椭圆面积，后者追求更接近圆形的比例。选择姿态必须根据任务需求，而不能把一个指标当作万能评分。
+
+\section{伪逆给出最小关节速度解}
+满行秩矩阵的右伪逆为
+\begin{equation}
+ J^+=J^\mathsf T(JJ^\mathsf T)^{-1}.
+\end{equation}
+它满足 $JJ^+=I_m$，所以 $\dot q_*=J^+v_d$ 能实现期望任务速度。为何是最小范数？任何其他精确解都能写成 $\dot q=\dot q_*+n$，其中 $Jn=0$。$\dot q_*$ 位于 $J$ 的行空间，$n$ 在零空间，两者正交，因此
+\begin{equation}
+ \|\dot q\|^2=\|\dot q_*\|^2+\|n\|^2\ge\|\dot q_*\|^2.
+\end{equation}
+这只是在同一瞬间、给定欧氏速度度量下的最小范数，不等于整条轨迹的最短时间、最小力矩或最小电能。
+
+若希望某些关节尽量少动，可选正定权重 $W$，最小化 $\frac12\dot q^\mathsf TW\dot q$，约束 $J\dot q=v_d$。拉格朗日函数为 $\frac12\dot q^\mathsf TW\dot q-\lambda^\mathsf T(J\dot q-v_d)$。令导数为零得到 $W\dot q=J^\mathsf T\lambda$，代回约束后得到加权伪逆
+\begin{equation}
+ J_W^+=W^{-1}J^\mathsf T(JW^{-1}J^\mathsf T)^{-1}.
+\end{equation}
+\begin{examplebox}[算例 给第一关节更高代价]
+任务是 $\dot q_1+\dot q_2=0.2$，即 $J=(1,1)$。普通最小范数解为 $(0.1,0.1)$。若 $W=\operatorname{diag}(4,1)$，则 $W^{-1}J^\mathsf T=(1/4,1)^\mathsf T$，$JW^{-1}J^\mathsf T=1.25$，所以
+\[
+ \dot q=(1/4,1)^\mathsf T\frac{0.2}{1.25}=(0.04,0.16)^\mathsf T.
+\]
+两种解都完成任务，但高代价关节动得更少。权重含义必须明确；取 $W=M$ 时关联的是瞬时动能度量，不可直接称为普遍的最小电能方案。
+\end{examplebox}
+
+\section{运动学零空间让主任务不变}
+\subsection{投影矩阵的三个性质}
+定义
+\begin{equation}
+ N=I-J^+J.
+\end{equation}
+由于 $JJ^+J=J$，有 $JN=0$。对 Moore--Penrose 伪逆，还满足 $N^\mathsf T=N$ 与 $N^2=N$，所以它是向 $J$ 零空间的正交投影。$N^2=N$ 表示“已经投影进去，再投一次不会改变”。完整速度解为
+\begin{equation}
+ \dot q=J^+v_d+N\dot q_0.
+\end{equation}
+$\dot q_0$ 是未经约束的次任务愿望，$N\dot q_0$ 保留其中不改变当前主任务速度的部分。若该愿望完全沿主任务方向，它可能被投影成零；这不是控制器失效，而是任务之间在当前几何状态下不兼容。
+
+\begin{examplebox}[算例 三个输入完成两个任务的全部计算]
+用简化矩阵
+\[
+ J=\begin{bmatrix}1&0&1\\0&1&1\end{bmatrix},\qquad v_d=(0.1,0.2)^\mathsf T.
+\]
+可算得
+\[
+ J^+=\frac13\begin{bmatrix}2&-1\\-1&2\\1&1\end{bmatrix},
+ \qquad
+ N=\frac13\begin{bmatrix}1&1&-1\\1&1&-1\\-1&-1&1\end{bmatrix}.
+\]
+主任务解为 $\dot q_*=(0,0.1,0.1)^\mathsf T$。若次任务希望第三个量降低，取 $\dot q_0=(0,0,-0.3)^\mathsf T$，投影为 $(0.1,0.1,-0.1)^\mathsf T$。合成速度为 $(0.1,0.2,0)^\mathsf T$，验算
+\[
+ J\dot q=(0.1+0,0.2+0)^\mathsf T=v_d.
+\]
+第三关节最终不动，是主任务正贡献与零空间负贡献抵消的结果，不能仅看某一项就判断最终运动。
+\end{examplebox}
+
+\subsection{七轴的一个冗余方向有明确条件}
+七轴臂控制完整六维位姿且雅可比秩为 6 时，$\dim\mathcal N(J)=7-6=1$。若只控制三维位置且秩为 3，零空间通常为四维；若只控制相机视轴方向而允许绕视轴旋转，任务维数又不同。首先定义实际任务，比先说“给七轴加零空间”更重要。
+
+为在图上看清冗余，本书用平面三关节臂控制二维位置：三关节减两约束，同样剩一维。固定末端位置而改变末端朝向，每个朝向对应一个不同的腕点，再由前两杆 IK 求解；于是得到一系列同末端位置、不同肘部形状。七轴六维任务的自运动（self-motion）具有类似直觉，但实际零空间方向由它自己的几何模型决定，不能照抄平面公式。
+
+\begin{figure}[htbp]
+\centering\includegraphics[width=0.9\linewidth]{figures/mk_nullspace.pdf}
+\caption{平面三关节臂控制二维位置的冗余示例。各条臂形的末端都精确位于同一目标，关节和中间连杆可以改变；这是零空间的直观模型，不是 NERO 的结构图。}
+\end{figure}
+
+\subsection{次任务目标怎样变成一个速度愿望}
+例如希望远离关节限位，定义关节中点 $q_{i,c}=(q_{i,\max}+q_{i,\min})/2$、范围 $r_i=q_{i,\max}-q_{i,\min}$，代价为
+\begin{equation}
+ h(q)=\frac12\sum_i\left(\frac{q_i-q_{i,c}}{r_i}\right)^2.
+\end{equation}
+梯度为 $[\nabla h]_i=(q_i-q_{i,c})/r_i^2$。沿负梯度走通常降低这个代价，因此可取 $\dot q_0=-k\nabla h$，再投影到零空间。投影后仍需检查实际降低速度：$\dot h=\nabla h^\mathsf TN\dot q_0=-k\nabla h^\mathsf TN\nabla h\le0$，这里利用普通正交投影 $N$ 半正定，且没有叠加主任务项的影响。主任务本身也会改变 $h$，所以总运动不保证限位代价永远下降。
+
+避障、保持舒适姿态、扩大可操作度也可构造目标，但梯度法只是局部方法。若主任务把机器人逼向障碍而可用零空间不足，不能承诺零空间一定避得开。需要在优化问题中加入明确的不等式约束，或由规划层改变主任务路径。
+
+
+\subsection{任务只控制部分方向时要重新定义雅可比}
+六维末端速度可写成 $V=(v_x,v_y,v_z,\omega_x,\omega_y,\omega_z)^\mathsf T$。若任务只规定三个平移速度，用行选择矩阵 $S=[I_3\ \ 0]$ 提取，得到 $v_d=SV$、$J_{\rm task}=SJ_g$。应对这个三行矩阵计算伪逆和零空间，而不是先对六行矩阵严格约束全部姿态，再期待它释放额外姿态自由度。
+
+以两连杆为例，在标准姿态若只规定向上速度，任务雅可比是 $J_y=(0.5,0)$。它的零空间包含第二关节单独运动，因为第二关节的瞬时运动不改变 $y$。但它会改变 $x$，所以这不是保持完整位置的零空间。说“末端不动”必须说明哪些方向被定义为主任务。
+
+所选方向还依赖坐标系。工具绕基座 $z$ 轴转过 $90^\circ$ 时，工具 $x$ 方向就是基座 $y$ 方向。若在工具系选择一个轴，应先把同一点的线角速度转换到工具轴表达，再选择相应行。方向选择、坐标换算与参考点变化是三件不同的操作，应分别记录。
+
+\subsection{两个任务有严格优先级时怎样串起来}
+设第一任务为 $J_1\dot q=v_1$，先取 $\dot q_1=J_1^+v_1$、$N_1=I-J_1^+J_1$。所有保持第一任务的补充速度都可写成 $N_1z$。第二任务要求
+\[
+ J_2(\dot q_1+N_1z)=v_2,
+\]
+所以它在剩余空间中的方程是 $(J_2N_1)z=v_2-J_2\dot q_1$，给出
+\begin{equation}
+ \dot q=\dot q_1+N_1(J_2N_1)^+(v_2-J_2\dot q_1).
+\end{equation}
+第二任务只使用第一任务剩余的能力。如果剩余能力不足，第二任务只能做最小二乘折中，第一任务仍保持其已满足部分。这个结论假设使用一致的精确伪逆，且没有后续独立截断打破关系。
+
+\begin{examplebox}[算例 两级任务都能满足时逐项求速度]
+取 $J_1=(1,1,0)$、$v_1=0.2$，得 $\dot q_1=(0.1,0.1,0)^\mathsf T$，
+\[
+ N_1=\begin{bmatrix}0.5&-0.5&0\\-0.5&0.5&0\\0&0&1\end{bmatrix}.
+\]
+第二任务取 $J_2=(0,1,1)$、$v_2=0.3$。剩余误差为 $0.3-0.1=0.2$，剩余雅可比为 $J_2N_1=(-0.5,0.5,1)$，平方范数为 1.5。所需补充速度为 $(-0.5,0.5,1)^\mathsf T(0.2/1.5)=(-1/15,1/15,2/15)^\mathsf T$，它已经位于第一任务零空间。
+最终速度为 $(1/30,1/6,2/15)^\mathsf T$。验算第一任务 $1/30+1/6=0.2$，第二任务 $1/6+2/15=0.3$。若给这两个任务随意加权求一个总平方误差，只能表达软优先级；权重再大也应与严格等式优先级区分。
+\end{examplebox}
+
+\section{阻尼伪逆的零空间并不严格为零}
+工程上常把 DLS 矩阵 $J_\lambda^+=J^\mathsf T(JJ^\mathsf T+\lambda^2I)^{-1}$ 代入 $N_\lambda=I-J_\lambda^+J$。但
+\begin{equation}
+ JN_\lambda
+ =\lambda^2(JJ^\mathsf T+\lambda^2I)^{-1}J,
+\end{equation}
+一般不为零。推导只需把 $JJ^\mathsf T$ 写成 $(JJ^\mathsf T+\lambda^2I)-\lambda^2I$。阻尼让逆映射平滑，也会让次任务影响主任务，称为任务泄漏；$N_\lambda$ 通常也不满足 $N_\lambda^2=N_\lambda$。
+
+\begin{examplebox}[算例 阻尼投影后的主任务速度不是零]
+取 $J=(1,1)$、$\lambda=0.5$，则 $J_\lambda^+=(1,1)^\mathsf T/2.25$。次任务愿望 $\dot q_0=(0.1,0.1)^\mathsf T$ 本来完全沿主任务方向；精确零空间投影会将它消掉。但阻尼投影得到
+\[
+ N_\lambda\dot q_0
+ =(0.1,0.1)^\mathsf T-(1,1)^\mathsf T\frac{0.2}{2.25}
+ =(0.011111,0.011111)^\mathsf T.
+\]
+所以主任务速度为 $J N_\lambda\dot q_0=0.022222$，并不为零。若要求严格优先级，应使用满足任务约束的分层求解，或明确允许并监测这种误差折中。
+\end{examplebox}
+
+另外，即便使用精确 $N(q)$，它也只保证当前瞬时速度不改变主任务。有限欧拉更新 $q_{k+1}=q_k+hN(q_k)\dot q_0$ 仍产生二阶位置误差；长时间累积可能漂移。每步更新雅可比、闭环纠正末端误差、使用更合适的约束积分或重投影，才能控制漂移。
+
+\section{运动学投影与力矩投影的边界}
+$JN=0$ 说的是关节速度映射为零，不是任意附加力矩都不会影响末端。力矩先经过惯量矩阵和其他动力学，再产生关节加速度。希望零空间力矩不引起任务加速度时，应检查的是相应动力学条件，例如涉及 $JM^{-1}$ 的映射。后续操作空间与阻抗章节会推导动力学一致投影。
+
+同样，运动学 IK 只能生成几何目标，不能解释“为什么可以手推”或“为什么位置很硬”。这些表现取决于驱动接口、反馈增益、重力和摩擦补偿、延迟等。把位置目标经 IK 算得准确，并不意味着已实现力控或低阻抗。
+
+\section{怎样核对你计算的雅可比}
+对位置雅可比第 $i$ 列，可用中心差分
+\begin{equation}
+ J_{p,i}^{\rm num}
+ =\frac{p(q+\epsilon e_i)-p(q-\epsilon e_i)}{2\epsilon}
+\end{equation}
+核对解析或库结果，其中 $e_i$ 是第 $i$ 个单位坐标向量。$\epsilon$ 太大时非线性误差明显，太小时舍入误差占主导；在双精度、弧度及米量级的教学例中可先试 $10^{-6}$，再比较相邻尺度的稳定性。它不是任何模型都唯一正确的常数。
+
+旋转部分不能直接对欧拉角做差后与几何角速度列比较；应使用相对旋转对数并保持坐标约定。核对工具点、参考系、线角顺序和关节索引之后，再看数值误差。这样可以避免“公式没错，但取的是法兰雅可比而误用于相机 TCP”的问题。
+
+\section{计算练习与逐步解答}
+\subsection*{题目}
+\begin{enumerate}
+\item 在标准姿态 $q=(0,\pi/2)$，关节速度 $(0.3,-0.1)^\mathsf T\,\mathrm{rad/s}$ 会产生什么末端线速度和角速度？
+\item 同一姿态，环境施加末端力 $(-4,6)^\mathsf T\,\mathrm N$，求关节外力矩；用上一题速度核对功率。
+\item 对 $J=(1,1)$，求普通伪逆与精确零空间投影。将 $\dot q_0=(0.3,-0.1)^\mathsf T$ 投影，并检查输出。
+\item 完全伸直时 $J=\begin{bmatrix}0&0\\1&0.5\end{bmatrix}$，目标速度 $v_d=(0.1,0.1)^\mathsf T$，取 $\lambda=0.1$ 求 DLS 速度，并计算真实可实现的任务速度。
+\end{enumerate}
+\subsection*{解答}
+\begin{enumerate}
+\item $v_x=-0.5\times0.3-0.5(-0.1)=-0.1\,\mathrm{m/s}$；$v_y=0.5\times0.3=0.15\,\mathrm{m/s}$。末端角速度为 $\dot q_1+\dot q_2=0.2\,\mathrm{rad/s}$，即绕平面法向正转。
+\item $\tau_1=(-0.5)(-4)+0.5\times6=5\,\mathrm{N\,m}$，$\tau_2=(-0.5)(-4)=2\,\mathrm{N\,m}$。关节功率为 $5\times0.3+2(-0.1)=1.3\,\mathrm W$；末端功率为 $(-4)(-0.1)+6(0.15)=1.3\,\mathrm W$。
+\item $J^+=(1/2,1/2)^\mathsf T$，$N=\frac12\begin{bmatrix}1&-1\\-1&1\end{bmatrix}$。投影结果为 $(0.2,-0.2)^\mathsf T$，$J(0.2,-0.2)^\mathsf T=0$。再投一次不改变结果。
+\item $JJ^\mathsf T+\lambda^2I=\operatorname{diag}(0.01,1.26)$。先求 $(JJ^\mathsf T+\lambda^2I)^{-1}v_d=(10,0.0793651)^\mathsf T$，再左乘 $J^\mathsf T$ 得 $\dot q=(0.0793651,0.0396825)^\mathsf T$。实际任务速度为 $(0,0.0992063)^\mathsf T$；不可达的 $x$ 方向仍然为零，$y$ 方向也因阻尼略有误差。
+\end{enumerate}
+
+\section*{本章与原稿的对应}
+本章整合 [A，第28--30页] 与 [B，第14--17、28--32页]，补充了功率推导、雅可比作用点、加速度项、加权速度度量、有限步长漂移与阻尼投影泄漏。七轴的主任务与零空间应先明确所控任务维度，再进入后续动力学与力控设计。

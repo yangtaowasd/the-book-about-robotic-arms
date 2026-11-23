@@ -1,0 +1,321 @@
+\chapter{三维位姿 旋转和李群}\label{ch:pose}
+\section{同一个点为什么需要坐标系标签}
+位置向量必须回答“相对谁的原点、沿谁的坐标轴量”。一台机械臂常同时使用世界系、基座系、法兰系、工具系和相机系。设 $p^B$ 是点 $P$ 在坐标系 $B$ 中的坐标，$R_{AB}$ 把 $B$ 中表达的向量转换为 $A$ 中表达，$p_{AB}$ 是 $B$ 原点在 $A$ 中的位置，则
+\begin{equation}
+ p^A=R_{AB}p^B+p_{AB}.
+\end{equation}
+上式描述同一个物理点的两种坐标，并不是让物体真的移动。若把式子用作主动旋转物体，也可以得到相同数值形式，但必须清楚所描述的对象。实际代码中保留 \texttt{R\_base\_tool}、\texttt{p\_base\_tool} 这样的方向信息，比一个无标签的 \texttt{R} 更容易排错。
+
+\begin{examplebox}[算例 把工具上的点换到基座坐标]
+工具原点在基座中的位置为 $p_{AB}=(0.3,0.2,0.1)^\mathsf T\,\mathrm m$，工具绕基座 $z$ 轴转了 $90^\circ$，故
+\[
+ R_{AB}=\begin{bmatrix}0&-1&0\\1&0&0\\0&0&1\end{bmatrix}.
+\]
+工具上的点 $p^B=(0.1,0,0.2)^\mathsf T\,\mathrm m$，先旋转得到 $(0,0.1,0.2)^\mathsf T$，再平移得到 $p^A=(0.3,0.3,0.3)^\mathsf T\,\mathrm m$。若只是工具 $x$ 轴方向向量 $d^B=(1,0,0)^\mathsf T$，换系结果为 $d^A=R_{AB}d^B=(0,1,0)^\mathsf T$，不能加原点平移。
+\end{examplebox}
+
+\begin{figure}[htbp]
+\centering\includegraphics[width=0.62\linewidth]{figures/mk_frames.pdf}
+\caption{二维投影中，同一点在基座系和工具系有不同坐标。位置变换包含原点平移，方向向量只改变分量表达。图中点取 $z$ 分量为零以便看清平面关系。}
+\end{figure}
+
+\section{旋转矩阵的列就是新坐标轴}
+$R_{AB}$ 的三列分别是 $B$ 的 $x,y,z$ 单位轴在 $A$ 中的表达。每根轴长度为 1，轴间相互垂直，所以
+\begin{equation}
+ R^\mathsf TR=I,\qquad R^{-1}=R^\mathsf T.
+\end{equation}
+此外要求 $\det R=+1$，排除镜像反射。满足这些条件的所有 $3\times3$ 矩阵构成 $SO(3)$，读作“三维特殊正交群”。“特殊”指行列式为正一，“正交”指列向量正交归一。
+
+三个基本旋转矩阵为
+\begin{align}
+ R_x(\alpha)&=\begin{bmatrix}1&0&0\\0&\cos\alpha&-\sin\alpha\\0&\sin\alpha&\cos\alpha\end{bmatrix},\\
+ R_y(\beta)&=\begin{bmatrix}\cos\beta&0&\sin\beta\\0&1&0\\-\sin\beta&0&\cos\beta\end{bmatrix},\\
+ R_z(\gamma)&=\begin{bmatrix}\cos\gamma&-\sin\gamma&0\\\sin\gamma&\cos\gamma&0\\0&0&1\end{bmatrix}.
+\end{align}
+正角度采用右手定则：右手拇指指向正轴，其余手指弯曲方向为正转向。
+
+\subsection{左乘和右乘必须连同轴的归属解释}
+若 $R$ 表示物体当前朝向，绕固定参考系的轴再转 $R_f$，更新为 $R_{\rm new}=R_fR$。绕物体当前自身轴转 $R_b$，更新为 $R_{\rm new}=RR_b$。这两种说法不能省掉“固定”和“自身”。
+\begin{examplebox}[算例 两次九十度旋转确实不交换]
+从向量 $a=(0,1,0)^\mathsf T$ 出发，先绕固定 $x$ 轴转 $90^\circ$，得到 $(0,0,1)^\mathsf T$；再绕固定 $z$ 轴转 $90^\circ$，仍是 $(0,0,1)^\mathsf T$，对应 $R_zR_xa$。
+反过来，先绕固定 $z$ 轴得 $(-1,0,0)^\mathsf T$，再绕固定 $x$ 轴不改变它，结果为 $(-1,0,0)^\mathsf T$，对应 $R_xR_za$。因此 $R_zR_x\ne R_xR_z$。
+\end{examplebox}
+
+数值积分后若 $\tilde R^\mathsf T\tilde R$ 偏离 $I$，可以用 SVD $\tilde R=U\Sigma V^\mathsf T$ 投影回旋转集合：
+\begin{equation}
+ R=U\operatorname{diag}(1,1,\det(UV^\mathsf T))V^\mathsf T.
+\end{equation}
+最后一项用于排除反射。直接使用 $UV^\mathsf T$ 只在其行列式已经为正时合适。更好的日常做法是用保持旋转结构的增量更新，减少这种修正需求。
+
+\section{齐次变换让平移和旋转一起连乘}
+把点扩展成 $\bar p=(p_x,p_y,p_z,1)^\mathsf T$，则
+\begin{equation}
+ T_{AB}=\begin{bmatrix}R_{AB}&p_{AB}\\0&1\end{bmatrix},
+ \qquad\bar p^A=T_{AB}\bar p^B.
+\end{equation}
+下方的 0 代表 $1\times3$ 零行。这样的刚体变换构成 $SE(3)$，即三维特殊欧氏群。连乘满足
+\begin{equation}
+ T_{AC}=T_{AB}T_{BC}
+ =\begin{bmatrix}R_{AB}R_{BC}&p_{AB}+R_{AB}p_{BC}\\0&1\end{bmatrix}.
+\end{equation}
+这说明后一段平移要先换到前一段坐标，才能相加。不能把不同坐标系中的两个位置向量直接加起来。
+
+\subsection{齐次变换的逆怎样推出来}
+从 $p^A=Rp^B+p$ 移项并左乘 $R^\mathsf T$，得 $p^B=R^\mathsf Tp^A-R^\mathsf Tp$，所以
+\begin{equation}
+ T^{-1}=\begin{bmatrix}R^\mathsf T&-R^\mathsf Tp\\0&1\end{bmatrix}.
+\end{equation}
+反变换的平移一般不是单纯 $-p$。对前面的 $90^\circ$ 旋转和位置，逆变换平移为
+\[
+ -R^\mathsf Tp=(-0.2,0.3,-0.1)^\mathsf T.
+\]
+代入点 $p^A=(0.3,0.3,0.3)^\mathsf T$，先得 $R^\mathsf Tp^A=(0.3,-0.3,0.3)^\mathsf T$，再加逆平移便回到 $p^B=(0.1,0,0.2)^\mathsf T$。
+
+若工具在法兰坐标中的安装位置向量为 $(0.1,0,0)^\mathsf T$，法兰绕基座 $z$ 轴转 $90^\circ$ 后，这个安装偏移会在基座中指向 $+y$。工具中心点（tool center point，TCP）与法兰点因此有不同的位置及线速度雅可比；设置 TCP 是几何问题，设置工具质量和质心是动力学问题，两者不可互相替代。
+
+\section{欧拉角的三次旋转和万向节锁}
+本书采用明确的 ZYX 约定：
+\begin{equation}
+ R=R_z(\psi)R_y(\theta)R_x(\phi),
+\end{equation}
+$\phi$ 为横滚 roll，$\theta$ 为俯仰 pitch，$\psi$ 为偏航 yaw。它既可读为绕固定轴依次 roll、pitch、yaw，也可读为绕随动自身轴依次 yaw、pitch、roll。只写“先绕 z 再绕 y 再绕 x”而不说明固定或随动，会产生歧义。
+
+在 $\cos\theta\ne0$ 且采用 $\theta\in[-\pi/2,\pi/2]$ 的分支时，可由矩阵反算
+\begin{equation}
+ \theta=\arcsin(-R_{31}),\quad
+ \psi=\operatorname{atan2}(R_{21},R_{11}),\quad
+ \phi=\operatorname{atan2}(R_{32},R_{33}).
+\end{equation}
+$\operatorname{atan2}(y,x)$ 同时利用两个分量判断象限；$\arctan(y/x)$ 不能正确区分 $x,y$ 都变号的情形。实际计算还应将 $\arcsin$ 的输入截断到 $[-1,1]$，避免舍入误差造成无效值。
+
+\subsection{角速度不是三个欧拉角导数的直接拼接}
+将各次转动轴转换到参考系，可得空间角速度
+\begin{equation}
+ \omega^A=E(\theta,\psi)
+ \begin{bmatrix}\dot\phi\\\dot\theta\\\dot\psi\end{bmatrix},
+ \quad
+ E=\begin{bmatrix}
+ \cos\psi\cos\theta&-\sin\psi&0\\
+ \sin\psi\cos\theta&\cos\psi&0\\
+ -\sin\theta&0&1
+ \end{bmatrix}.
+\end{equation}
+第一列是 roll 轴在参考系中的方向，第二列是 pitch 轴，第三列是 yaw 轴。$\det E=\cos\theta$；当 $\theta=\pm\pi/2$，第一与第三列共线，两个角速度参数只能共同描述一个实际转动方向。这是万向节锁（gimbal lock），属于参数化奇异；刚体本身仍有三个物理转动自由度。
+
+\begin{examplebox}[算例 欧拉角变化很大 实际姿态变化却很小]
+纯偏航从 $179^\circ$ 变为 $-179^\circ$，直接相减得到 $-358^\circ$。实际相对旋转为
+\[
+ R_z(-179^\circ)R_z(179^\circ)^\mathsf T
+ =R_z(-358^\circ)=R_z(2^\circ).
+\]
+最短转角只有 $2^\circ=0.0349066\,\mathrm{rad}$。这解释为什么显示角度看起来跳变时，机械臂不一定真的瞬间转了一圈；也说明不能直接用未处理的欧拉角差构造姿态反馈。
+\end{examplebox}
+
+\section{轴角 反对称矩阵和罗德里格斯公式}
+\subsection{把叉乘写成矩阵乘法}
+对 $a=(a_x,a_y,a_z)^\mathsf T$，定义 hat 映射
+\begin{equation}
+ \widehat a=[a]_\times=
+ \begin{bmatrix}0&-a_z&a_y\\a_z&0&-a_x\\-a_y&a_x&0\end{bmatrix}.
+\end{equation}
+它满足 $\widehat a\,b=a\times b$，其中叉乘方向按右手定则、长度为 $\|a\|\|b\|\sin\gamma$。反操作 vee 映射把此反对称矩阵还原为向量：$(\widehat a)^\vee=a$。这只是同一信息的两种排列，不是新的物理运算。
+
+绕单位轴 $u$ 转角 $\theta$ 的轴角（axis-angle）可合成旋转向量 $\varphi=\theta u$，其长度等于转角。令 $U=\widehat u$。由向量三重积 $u\times(u\times a)=u(u^\mathsf Ta)-a$，有 $U^2=uu^\mathsf T-I$；再乘 $U$ 得 $U^3=-U$。矩阵指数的级数便可按奇偶次幂合并：
+\begin{align}
+ e^{\theta U}
+ &=I+\theta U+\frac{\theta^2}{2!}U^2
+       -\frac{\theta^3}{3!}U-\frac{\theta^4}{4!}U^2+\cdots\\
+ &=I+\sin\theta\,U+(1-\cos\theta)U^2.
+\end{align}
+这就是罗德里格斯（Rodrigues）公式。它与矩阵指数相等，不是经验近似。
+
+\begin{examplebox}[算例 同一个一百二十度旋转的矩阵形式]
+取 $u=(1,1,1)^\mathsf T/\sqrt3$、$\theta=120^\circ=2\pi/3$。因此 $\sin\theta=\sqrt3/2$、$1-\cos\theta=3/2$，且
+\[
+ U=\frac1{\sqrt3}\begin{bmatrix}0&-1&1\\1&0&-1\\-1&1&0\end{bmatrix},
+ \qquad U^2=\frac13\begin{bmatrix}-2&1&1\\1&-2&1\\1&1&-2\end{bmatrix}.
+\]
+代入得到
+\[
+ R=\begin{bmatrix}0&0&1\\1&0&0\\0&1&0\end{bmatrix}.
+\]
+它把原 $x$ 方向转到 $y$，把 $y$ 转到 $z$，把 $z$ 转到 $x$；轴 $u$ 自己不动。旋转向量三个分量都为 $2\pi/(3\sqrt3)=1.209200\,\mathrm{rad}$。
+\end{examplebox}
+
+\begin{figure}[htbp]
+\centering\includegraphics[width=0.62\linewidth]{figures/mk_axis_angle.pdf}
+\caption{绕 $(1,1,1)/\sqrt3$ 旋转 $120^\circ$ 的精确几何关系。原坐标轴按 $x\to y\to z\to x$ 循环，灰色轴向保持不变。}
+\end{figure}
+
+\subsection{从旋转矩阵求回旋转向量}
+对 $0<\theta<\pi$，可由
+\begin{equation}
+ \theta=\arccos\frac{\operatorname{tr}R-1}{2},\qquad
+ \varphi=\frac{\theta}{2\sin\theta}(R-R^\mathsf T)^\vee
+\end{equation}
+求出主值旋转向量。迹 $\operatorname{tr}R$ 是对角线元素之和。上例迹为零，所以 $\theta=\arccos(-1/2)=120^\circ$。当 $\theta\to0$，$\theta/\sin\theta\to1$，应使用级数或稳定算法；当 $\theta\to\pi$，反对称部分也趋于零，需要从对角元素、特征方向或四元数稳定提轴。$\theta=\pi$ 时轴 $u$ 与 $-u$ 给出同一旋转，主值在这里不能全局连续。
+
+\section{四元数为何有四个数却只描述三个自由度}
+为了不与关节向量 $q$ 混淆，四元数记为 $\mathsf q=(w,v)$，本章固定标量在前，$v=(x,y,z)^\mathsf T$。单位四元数定义为
+\begin{equation}
+ \mathsf q=\left(\cos\frac\theta2,\ u\sin\frac\theta2\right),
+ \qquad w^2+v^\mathsf Tv=1.
+\end{equation}
+四个数受一个单位长度约束，所以连续自由度仍为三。$\mathsf q$ 与 $-\mathsf q$ 表示同一物理旋转；这是双覆盖，不是两个不同的姿态。
+
+Hamilton 乘法定义为
+\begin{equation}
+ (w_1,v_1)\otimes(w_2,v_2)
+ =(w_1w_2-v_1^\mathsf Tv_2,
+ w_1v_2+w_2v_1+v_1\times v_2).
+\end{equation}
+单位四元数的逆为共轭 $\mathsf q^*=(w,-v)$。向量 $a$ 经旋转后的结果，是 $\mathsf q\otimes(0,a)\otimes\mathsf q^*$ 的向量部分。展开乘法得旋转矩阵
+\begin{equation}
+ R=\begin{bmatrix}
+ 1-2(y^2+z^2)&2(xy-wz)&2(xz+wy)\\
+ 2(xy+wz)&1-2(x^2+z^2)&2(yz-wx)\\
+ 2(xz-wy)&2(yz+wx)&1-2(x^2+y^2)
+ \end{bmatrix}.
+\end{equation}
+\begin{examplebox}[算例 用四元数重算上一节的旋转]
+$\theta=120^\circ$、$u=(1,1,1)/\sqrt3$ 时，$w=\cos60^\circ=0.5$，三个向量分量均为 $\sin60^\circ/\sqrt3=0.5$。所以 $\mathsf q=(0.5,0.5,0.5,0.5)$。矩阵对角元素为 $1-2(0.25+0.25)=0$；$R_{21}=2(0.25+0.25)=1$，$R_{12}=2(0.25-0.25)=0$。九项代完，恰好回到前面的循环置换矩阵。
+\end{examplebox}
+
+传输姿态前必须声明顺序、乘法约定、参考系和主动/被动含义。四个数都在 $[-1,1]$ 内、范数也为 1，并不能证明顺序正确。一个已知 $90^\circ$ 绕单轴旋转的用例，比随机四元数更容易检验接口。
+
+\subsection{插值与角速度积分}
+两个单位四元数点积为负时，先把其中一个取负，使插值使用较短路径。令 $\Omega=\arccos(\mathsf q_0^\mathsf T\mathsf q_1)$，球面线性插值（spherical linear interpolation，SLERP）为
+\begin{equation}
+ \mathsf q(s)=\frac{\sin[(1-s)\Omega]}{\sin\Omega}\mathsf q_0
+ +\frac{\sin(s\Omega)}{\sin\Omega}\mathsf q_1,
+ \qquad 0\le s\le1.
+\end{equation}
+这里 $\Omega$ 是四维单位球面上的夹角，物理最短转角为 $2\Omega$。当 $\Omega$ 很小时，使用归一化线性插值可避免除以小数。
+
+从单位姿态到 $R_z(90^\circ)$，$s=1/2$ 给出 $R_z(45^\circ)$，四元数为 $(\cos22.5^\circ,0,0,\sin22.5^\circ)\approx(0.923880,0,0,0.382683)$。若本体系角速度为 $\omega^B$，时间步为 $h$，令 $\delta=\|\omega^B\|h$，则右乘增量
+\begin{equation}
+ \mathsf q_{k+1}=\mathsf q_k\otimes
+ \left(\cos\frac\delta2,
+ \frac{\omega^B}{\|\omega^B\|}\sin\frac\delta2\right).
+\end{equation}
+$\omega^B=0$ 时增量取单位四元数。若角速度在参考系表达，则要左乘相应增量。数值误差可通过归一化控制，但归一化不能修正坐标系或乘法顺序错误。
+
+\section{李群和李代数是在结构内做小变化}
+群（group）表示一种组合运算具有封闭性、单位元、逆和结合律；旋转连续地组合仍是旋转，单位旋转是不动，每个旋转都可转回去。李群（Lie group）还具有光滑结构，因此能讨论局部小变化。李代数（Lie algebra）是单位元处的切空间；$SO(3)$ 的李代数由 $3\times3$ 反对称矩阵组成。
+
+为何是反对称矩阵？对 $R(t)R(t)^\mathsf T=I$ 求导：
+\begin{equation}
+ \dot R R^\mathsf T+R\dot R^\mathsf T=0.
+\end{equation}
+因此 $\dot R R^\mathsf T$ 与自己的转置互为相反数，可写成 $\widehat\omega^A$。得到
+\begin{equation}
+ \dot R=\widehat\omega^A R=R\widehat\omega^B,
+ \qquad\omega^A=R\omega^B.
+\end{equation}
+指数映射 $\operatorname{Exp}(\widehat\varphi)$ 把小变化或有限旋转向量送到旋转矩阵；对数映射 $\operatorname{Log}(R)$ 做局部逆运算。有限旋转向量也能被当作普通三维数字存储，但直接相加并不等于组合两个有限旋转。
+
+Baker--Campbell--Hausdorff（BCH）展开的前几项说明差别：
+\begin{equation}
+ \operatorname{Log}\left(e^{\widehat a}e^{\widehat b}\right)^\vee
+ =a+b+\tfrac12(a\times b)+\text{更高阶项}.
+\end{equation}
+若 $a=(0.1,0,0)^\mathsf T$、$b=(0,0.1,0)^\mathsf T$，相加只得到 $(0.1,0.1,0)$，加入二阶项得 $(0.1,0.1,0.005)$。多出来的 $z$ 分量反映旋转顺序，而非传感器噪声。
+
+\subsection{姿态误差同时包含方向 符号和坐标系}
+设当前工具朝向 $R$、期望朝向 $R_d$ 均将各自局部分量转换到同一基座系。为与“实际减期望”的位置误差一致，定义基座表达的旋转误差
+\begin{equation}
+ e_R^A=\operatorname{Log}(RR_d^\mathsf T)^\vee,
+ \qquad
+ e_R^D=\operatorname{Log}(R_d^\mathsf TR)^\vee,
+ \qquad e_R^A=R_d e_R^D.
+\end{equation}
+第二个式子可由 $R=R_d\operatorname{Exp}(\widehat e_R^D)$ 理解，它以期望坐标为右扰动的参考。若改用 $\operatorname{Log}(R^\mathsf TR_d)^\vee$，则表示从当前朝向走向期望朝向的增量，符号反转。只写一个三维误差而省略约定，会使后面的恢复力矩方向难以核对。
+
+例如 $R=R_z(10^\circ)$、$R_d=I$，则 $e_R^A=(0,0,0.174533)^\mathsf T$。恢复方向是负 $z$ 转动。对于一般大姿态误差，$\dot e_R$ 并不严格等于 $\omega-\omega_d$；中间还存在对数映射的雅可比。小误差时该雅可比接近单位阵，这也是很多工程控制式的局部近似基础。
+
+对固定 $R_d$，若 $R R_d^\mathsf T=\operatorname{Exp}(\widehat e)$，有 $\omega^A=J_l(e)\dot e$。$J_l$ 称为 $SO(3)$ 左雅可比：
+\begin{equation}
+ J_l(e)=I+\frac{1-\cos\theta}{\theta^2}\widehat e
+ +\frac{\theta-\sin\theta}{\theta^3}\widehat e^{\,2},\qquad\theta=\|e\|.
+\end{equation}
+这里的 $J_l$ 是旋转参数映射的雅可比，不是机械臂关节到末端的雅可比。理解它们都来自“局部导数”，同时保留不同下标，是避免混淆的关键。
+
+\section{位姿旋量和伴随变换}
+\subsection{六维数的前后顺序和作用点必须明确}
+本书六维速度统一采用线速度在前、角速度在后，即 $V=(v^\mathsf T,\omega^\mathsf T)^\mathsf T$。但仅有顺序还不够：线速度是哪个点的？由 $T=\begin{bmatrix}R&p\\0&1\end{bmatrix}$，空间旋量与本体旋量分别定义为
+\begin{equation}
+ \widehat V_s=\dot TT^{-1},\qquad
+ \widehat V_b=T^{-1}\dot T.
+\end{equation}
+直接相乘得到
+\begin{equation}
+ V_s=\begin{bmatrix}\dot p-\omega^A\times p\\\omega^A\end{bmatrix},
+ \qquad
+ V_b=\begin{bmatrix}R^\mathsf T\dot p\\R^\mathsf T\omega^A\end{bmatrix}.
+\end{equation}
+空间旋量的前三项一般不是工具原点的速度 $\dot p$。若一个接口返回基座方向表达、但以工具原点为参考点的几何速度 $(\dot p,\omega^A)$，它与上面的空间旋量不同。许多“WORLD”与“工具原点对齐”接口的差异正发生在这里。
+
+两种旋量用伴随矩阵（adjoint matrix）转换：
+\begin{equation}
+ V_s=\operatorname{Ad}_T V_b,
+ \qquad
+ \operatorname{Ad}_T=\begin{bmatrix}R&\widehat pR\\0&R\end{bmatrix}.
+\end{equation}
+如果只是同一个物理点的线速度和角速度换表达坐标，不移动参考点，则只需块对角旋转 $\operatorname{diag}(R,R)$；不要额外加入 $\widehat pR$。
+
+\subsection{六维指数中的平移不是简单照抄前三项}
+对积分旋量 $\xi=(\rho,\varphi)$，hat 矩阵定义为 $\widehat\xi=\begin{bmatrix}\widehat\varphi&\rho\\0&0\end{bmatrix}$。其指数是
+\begin{equation}
+ \operatorname{Exp}(\widehat\xi)
+ =\begin{bmatrix}\operatorname{Exp}(\widehat\varphi)&J_l(\varphi)\rho\\0&1\end{bmatrix}.
+\end{equation}
+$\rho$ 是旋量坐标，不总等于最终位置 $p$。因为在转动过程中，局部平移方向也在改变。
+\begin{examplebox}[算例 一边前进一边转弯的一秒运动]
+从单位位姿开始，以恒定本体速度 $v^B=(1,0,0)^\mathsf T\,\mathrm{m/s}$、角速度 $\omega^B=(0,0,\pi/2)^\mathsf T\,\mathrm{rad/s}$ 运动 1 s。此时 $\rho=(1,0,0)^\mathsf T$、$\varphi=(0,0,\pi/2)^\mathsf T$。指数给出的位移为
+\[
+ p=\begin{bmatrix}\sin(\pi/2)/(\pi/2)\\(1-\cos(\pi/2))/(\pi/2)\\0\end{bmatrix}
+ =\begin{bmatrix}2/\pi\\2/\pi\\0\end{bmatrix}\mathrm m.
+\]
+物体走了半径 $2/\pi\,\mathrm m$ 的四分之一圆弧，最后朝向转过 $90^\circ$。如果把平移直接写成 $(1,0,0)$，就把转弯错误地算成了直走。
+\end{examplebox}
+
+\begin{figure}[htbp]
+\centering\includegraphics[width=0.62\linewidth]{figures/mk_screw.pdf}
+\caption{恒定本体速度与恒定角速度形成圆弧，箭头显示局部前进轴。位姿指数同时积分了旋转与平移的耦合。}
+\end{figure}
+
+\subsection{力旋量用功率不变决定变换规则}
+力旋量记为 $F=(f,m)$，前面是力、后面是关于指定参考点的力矩。瞬时功率为 $P=F^\mathsf TV=f^\mathsf Tv+m^\mathsf T\omega$。若 $V_A=\operatorname{Ad}_T V_B$，要求两种表达的功率相等，便有
+\begin{equation}
+ F_A=\operatorname{Ad}_T^{-\mathsf T}F_B.
+\end{equation}
+展开为 $f_A=Rf_B$，$m_A=p\times Rf_B+Rm_B$。例如作用点距参考原点 $p=(0.3,0,0)^\mathsf T\,\mathrm m$，力为 $f=(0,10,0)^\mathsf T\,\mathrm N$，该点自身力矩为零，则关于参考原点的力矩为 $(0,0,3)^\mathsf T\,\mathrm{N\,m}$。换参考点时漏掉这一项，会让负载与外力估计出现姿态相关误差。
+
+\section{小扰动导数和姿态平均}
+若旋转后的点为 $b=Ra$，对右扰动 $R'=R\operatorname{Exp}(\widehat{\delta\varphi})$，一阶展开
+\[
+ b'\approx R(I+\widehat{\delta\varphi})a
+ =Ra-R\widehat a\,\delta\varphi.
+\]
+所以 $\partial b/\partial\delta\varphi=-R\widehat a$。对左扰动则得到 $-\widehat{Ra}$。标定求解、姿态估计和数值 IK 里使用的导数必须与扰动定义一致。
+
+多个相近姿态的平均，也可先在当前估计 $\bar R$ 的切空间中求平均误差 $\bar e=N^{-1}\sum_i\operatorname{Log}(\bar R^\mathsf TR_i)^\vee$，再更新 $\bar R\leftarrow\bar R\operatorname{Exp}(\widehat{\bar e})$，重复到小误差。姿态分散接近半圈时，均值可能不唯一或依赖初始化；“先平均四元数再归一化”若不处理符号，也会把相同姿态的 $\mathsf q$ 与 $-\mathsf q$ 平均成零。
+
+\section{计算练习与逐步解答}
+\subsection*{题目}
+\begin{enumerate}
+\item $R_{AB}=R_z(90^\circ)$、$p_{AB}=(1,0,0)^\mathsf T\,\mathrm m$，点 $p^B=(0,2,0)^\mathsf T\,\mathrm m$。求 $p^A$ 与逆变换平移。
+\item 绕单位轴 $(0,1,0)^\mathsf T$ 转 $60^\circ$，求标量在前的单位四元数与旋转矩阵，检验它对 $(1,0,0)^\mathsf T$ 的作用。
+\item 当前 $R=R_z(-170^\circ)$、期望 $R_d=R_z(170^\circ)$。按本书实际减期望的定义求主值姿态误差；若以恒定 $10^\circ/\mathrm s$ 沿最短方向回到期望，需多久？
+\item 一作用点相对基座原点为 $(0,0.2,0)^\mathsf T\,\mathrm m$，施加力 $(5,0,0)^\mathsf T\,\mathrm N$，作用点自身无力矩。求关于基座原点的力矩。
+\end{enumerate}
+\subsection*{解答}
+\begin{enumerate}
+\item $Rp^B=(-2,0,0)^\mathsf T$，加平移得到 $p^A=(-1,0,0)^\mathsf T\,\mathrm m$。逆平移为 $-R^\mathsf Tp_{AB}=-(0,-1,0)^\mathsf T=(0,1,0)^\mathsf T\,\mathrm m$。使用逆变换可恢复原点坐标。
+\item $\mathsf q=(\cos30^\circ,0,\sin30^\circ,0)=(\sqrt3/2,0,1/2,0)$。$R_y(60^\circ)=\begin{bmatrix}1/2&0&\sqrt3/2\\0&1&0\\-\sqrt3/2&0&1/2\end{bmatrix}$。输入 $(1,0,0)^\mathsf T$ 得 $(1/2,0,-\sqrt3/2)^\mathsf T$，长度仍为 1。
+\item $RR_d^\mathsf T=R_z(-340^\circ)=R_z(20^\circ)$，主值误差为 $(0,0,\pi/9)^\mathsf T$，即正 $20^\circ$。回到期望应沿负 $z$ 转 $20^\circ$，用时 $20/10=2\,\mathrm s$；这与直接相减得到的 $-340^\circ$ 不同。
+\item 叉乘 $p\times f=(0,0,-0.2\cdot5)^\mathsf T=(0,0,-1)^\mathsf T\,\mathrm{N\,m}$。力矩方向由右手定则确定，不能只写正的“力乘距离”。
+\end{enumerate}
+
+\section*{本章与原稿的对应}
+本章整合 [A，第22--26页] 与 [B，第3--8、24--27页]。所有旋转约定均在正文中固定，并补充对数误差符号、旋量参考点、力旋量对偶变换和位姿指数的数字推导，避免把几何速度、空间旋量和欧拉角导数混为一谈。

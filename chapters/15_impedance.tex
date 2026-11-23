@@ -1,0 +1,319 @@
+\chapter{从模型补偿到阻抗导纳和接触力}
+\label{ch:impedance}
+
+让机械臂到达一点与让机械臂被人推时表现出指定软硬程度，是不同的控制目标。前者主要关心运动误差，后者还要规定外力与运动之间的关系。本章先解释模型补偿能替反馈承担什么，再用质量弹簧阻尼模型逐项推导柔顺控制。所有增益示例均用于教学计算；真机参数还取决于实际接口、惯量、内环、延迟和执行器限制。
+
+\section{重力补偿在做什么以及没有做什么}
+
+全书动力学约定为
+\begin{equation}
+M\ddot q+C\dot q+g+\tau_f=\tau_{\rm cmd}+\tau_{\rm ext}.
+\label{eq:cf_full_dyn}
+\end{equation}
+采用定点控制
+\begin{equation}
+\tau_{\rm cmd}=\hat g(q)-K_pe-K_d\dot q,
+\qquad e=q-q_d.
+\label{eq:cf_gpd}
+\end{equation}
+$\hat g$ 提供托住模型自重的力矩；$-K_pe$ 提供虚拟弹簧；$-K_d\dot q$ 提供速度相关阻尼。阻尼在静止时为零，因此“把 $K_p$ 设零、保留一点 $K_d$ 就能托住机械臂”不成立：静止托举依赖重力补偿或其他支撑力矩，不来自阻尼。
+
+若模型准确、外力为零、摩擦先忽略，将控制律代入得到
+\[
+M\ddot q+C\dot q+K_d\dot q+K_pe=0.
+\]
+在静止状态，若重力存在残差 $\Delta g=\hat g-g$，则 $K_pe=\Delta g-\tau_f+\tau_{\rm ext}$。恢复误差的方向可以帮助判断残差方向，但不能仅从一条末端误差曲线唯一识别所有来源。
+
+\begin{examplebox}[算例 15A 一点重力误差怎样成为可见位置偏差]
+取单轴 $K_p=10\,\mathrm{N\,m/rad}$，真实重力为 $0.55\,\mathrm{N\,m}$，补偿只给 $0.50$。忽略摩擦和外力，静止时
+\[
+e_\infty=\frac{0.50-0.55}{10}=-0.005\,\mathrm{rad}=-0.2865^\circ.
+\]
+若把刚度减为 2，偏差变为 $-0.025\,\mathrm{rad}=-1.4324^\circ$。若先把重力残差减到 $0.01\,\mathrm{N\,m}$，则在刚度2下也能回到 $0.005\,\mathrm{rad}$ 的误差尺度。较软又较准的关键工作之一是降低未补偿力矩。
+\end{examplebox}
+
+\subsection{定点稳定性的完整能量抵消}
+
+取 $V=\tfrac12\dot q^\top M\dot q+\tfrac12 e^\top K_pe$，其中固定目标满足 $\dot e=\dot q$。求导并代入闭环：
+\begin{align}
+\dot V
+&=\dot q^\top M\ddot q+\tfrac12\dot q^\top\dot M\dot q
++e^\top K_p\dot q\\
+&=-\dot q^\top K_d\dot q
++\tfrac12\dot q^\top(\dot M-2C)\dot q\\
+&=-\dot q^\top K_d\dot q\le0.
+\end{align}
+第二项为零是因为 $\dot M-2C$ 反对称。若未补偿摩擦是耗散的，满足 $\dot q^\top\tau_f\ge0$，则还多出一个非正项 $-\dot q^\top\tau_f$。
+
+这个证明依赖精确重力、固定目标、理想连续力矩实现、合适的状态域及增益等条件。若加入任意模型前馈、带延迟的摩擦抵消或大幅变化的参考，必须重新分析，不能说“前馈加 PD 一定稳定”。关节限位、力矩饱和和几何约束也没有自动包括在上述证明中。
+
+\section{计算力矩怎样把期望加速度变成实际力矩}
+
+定义速度误差 $\dot e=\dot q-\dot q_d$，希望误差满足
+\[
+\ddot e+K_v^a\dot e+K_p^a e=0.
+\]
+上标 $a$ 提醒这组增益输出的是加速度，单位分别为 $\mathrm{s^{-1}}$ 和 $\mathrm{s^{-2}}$。先构造期望实际加速度
+\[
+a=\ddot q_d-K_v^a\dot e-K_p^a e,
+\]
+再用逆动力学给出
+\begin{equation}
+\tau_{\rm cmd}=\hat M(q)a+\hat C(q,\dot q)\dot q
++\hat g(q)+\hat\tau_f.
+\label{eq:cf_computed}
+\end{equation}
+模型完全一致、外力为零时，把式\eqref{eq:cf_computed}代入式\eqref{eq:cf_full_dyn}，得到 $M\ddot q=Ma$，即 $\ddot q=a$，所要求的误差方程成立。
+
+这里用的是\textbf{参考加速度 $\ddot q_d$}，加上实测位置与速度形成的反馈，不要求把实测位置二次差分成加速度再放回控制律。辨识可能需要估计实测加速度，计算力矩控制本身并不因此必须测量它。
+
+\begin{examplebox}[算例 15B 计算一次模型控制力矩]
+单轴取 $M=0.1$、黏性项 $b=0.2$、$\hat g=0.5$，当前 $q-q_d=0.02\,\mathrm{rad}$、$\dot q=0.05\,\mathrm{rad/s}$，目标速度和加速度均为零。取 $K_p^a=100$、$K_v^a=14$：
+\[
+a=-100(0.02)-14(0.05)=-2.7\,\mathrm{rad/s^2},
+\]
+\[
+\tau=0.1(-2.7)+0.2(0.05)+0.5=0.24\,\mathrm{N\,m}.
+\]
+若真实重力也是 0.5，代入真实对象得到 $\ddot q=-2.7$；若真实重力为0.55，则实际加速度为 $(0.24-0.01-0.55)/0.1=-3.2$，比期望多了 $-0.5\,\mathrm{rad/s^2}$。模型误差没有消失，它成为误差动力学的输入。
+\end{examplebox}
+
+沿期望轨迹提前算 $\tau_{\rm ff}=M(q_d)\ddot q_d+C(q_d,\dot q_d)\dot q_d+g(q_d)$，再叠加物理单位的关节 PD，是另一种常用结构。它与使用当前状态的完整反馈线性化不相同：跟踪误差大时，前馈模型与实际姿态不一致，不能声称精确解耦。
+
+\section{阻抗规定受力后怎样偏离目标}
+
+先用一个平移方向说明。设目标位置 $x_d$，实际位置 $x$，误差 $e_x=x-x_d$。目标阻抗为
+\begin{equation}
+m_d\ddot e_x+D\dot e_x+Ke_x=F_{\rm ext}.
+\label{eq:cf_target_impedance}
+\end{equation}
+$m_d$ 是期望质量，单位 kg；$D$ 是阻尼，单位 $\mathrm{N\,s/m}$；$K$ 是刚度，单位 $\mathrm{N/m}$；$F_{\rm ext}$ 是环境施加给机器人的力。恢复弹簧力为 $-Ke_x$，与位移方向相反。
+
+以速度为端口时，机械阻抗是 $Z_v(s)=F/V=m_ds+D+K/s$；以位移为输入定义时，则常写动态刚度 $F/X=m_ds^2+Ds+K$。文献有时都称为阻抗，读公式时必须看分母是速度还是位移，不能只看名称。两者相差一个 $s$。
+
+\begin{examplebox}[算例 15C 从软硬和质量算阻尼]
+取 $m_d=2\,\mathrm{kg}$、$K=200\,\mathrm{N/m}$，希望临界阻尼 $\zeta=1$。由
+\[
+\omega_n=\sqrt{K/m_d}=10\,\mathrm{rad/s},\qquad
+D=2\zeta\sqrt{Km_d}=40\,\mathrm{N\,s/m}.
+\]
+持续受到 $5\,\mathrm{N}$ 外力后，最终误差为 $e_x=5/200=0.025\,\mathrm{m}$。若误差为5 mm，恢复力只有1 N；若运动速度为0.1 m/s，阻尼力已有4 N。低刚度不等于低阻尼，也不等于拖起来处处轻。
+\end{examplebox}
+
+\begin{figure}[htbp]
+\centering\includegraphics[width=.95\linewidth]{figures/cf_impedance_bias.pdf}
+\caption{刚度越低，同一外力造成的位移越大，模型残差造成的偏差也越大。左图对每个刚度均采用 $D=2\sqrt{2K}$，以保持临界阻尼。}
+\end{figure}
+
+若要求某方向在未知残余力不超过 $F_b$ 时稳态误差不超过 $e_b$，单方向静态关系要求 $K\ge F_b/e_b$。例如 $F_b=1\,\mathrm{N}$、$e_b=1\,\mathrm{mm}$，要求至少 $1000\,\mathrm{N/m}$。要在 $K=100$ 时达到同样误差，残余力就必须压到约 $0.1\,\mathrm{N}$。这条关系能把“又软又准”转化成可测的补偿精度目标。
+
+\subsection{相对速度阻尼与绝对速度阻尼}
+
+定点时 $\dot x_d=0$，$-D\dot x$ 与 $-D(\dot x-\dot x_d)$ 相同。移动目标时不相同。例如目标以 $0.1\,\mathrm{m/s}$ 匀速运动，$D=40$、$K=200$，若采用 $F=-K(x-x_d)-D\dot x$，稳定匀速跟踪时
+\[
+0=-Ke_x-D(0.1)\quad\Longrightarrow\quad e_x=-0.02\,\mathrm{m}.
+\]
+没有任何模型误差也会落后2 cm。使用相对速度阻尼，并正确处理期望加速度，才对应式\eqref{eq:cf_target_impedance}的移动参考定义。
+
+\section{用雅可比转置把末端恢复力变成关节力矩}
+
+在某一任务空间中，设 $\dot x=J\dot q$，且力与速度在同一坐标系、同一点表达。由功率相等
+\[
+F^\top\dot x=F^\top J\dot q=(J^\top F)^\top\dot q
+\]
+得到 $\tau=J^\top F$。简化笛卡尔弹簧阻尼控制为
+\begin{equation}
+\tau_{\rm cmd}=\hat g+\hat\tau_f+
+J^\top[-K_xe_x-D_x\dot e_x]+\tau_{\rm null}.
+\label{eq:cf_simple_impedance}
+\end{equation}
+这里先只把 $x$ 看作平移任务或局部适当坐标；完整三维姿态误差、角速度与几何雅可比的关系见下一章。$\tau_{\rm null}$ 如何构造也不能只凭“投影”两个字处理。
+
+\begin{examplebox}[算例 15D 两连杆的笛卡尔弹簧力矩]
+在教学位形 $q=(0,\pi/2)$，$J=\left[\begin{smallmatrix}-0.5&-0.5\\0.5&0\end{smallmatrix}\right]$。设平移误差为 $e_x=[0.01,-0.02]^\top\,\mathrm{m}$，速度误差为 $[0.03,-0.01]^\top\,\mathrm{m/s}$，
+\[
+K_x=\operatorname{diag}(200,100),\quad
+D_x=\operatorname{diag}(20,10).
+\]
+弹簧力为 $[-2,2]^\top$，阻尼力为 $[-0.6,0.1]^\top$，合力为 $F=[-2.6,2.1]^\top\,\mathrm{N}$。关节反馈力矩为
+\[
+J^\top F=
+\begin{bmatrix}-0.5&0.5\\-0.5&0\end{bmatrix}
+\begin{bmatrix}-2.6\\2.1\end{bmatrix}
+=\begin{bmatrix}2.35\\1.30\end{bmatrix}\,\mathrm{N\,m}.
+\]
+还需叠加重力等补偿项。虚拟弹簧势能为 $\tfrac12e_x^\top K_xe_x=0.03\,\mathrm{J}$，可用作单位和符号检查。
+\end{examplebox}
+
+在无预载、小位移和固定姿态附近，$\delta x=J\delta q$，所以关节等效刚度近似为 $K_q=J^\top K_xJ$。它一般不是对角阵。关节控制器只给每轴独立的 $k_p,k_d$，通常无法任意指定末端某个空间方向的软硬。若已有接触预载，雅可比随姿态改变还会产生几何刚度项，不能把这条局部关系当成全局精确公式。
+
+\subsection{只写弹簧阻尼不代表已经指定了虚拟质量}
+
+式\eqref{eq:cf_simple_impedance}常用于低速柔顺，但它保留了机器人本来的惯性、耦合、驱动器动态和未补偿项。$K_x,D_x$ 的输入并不会自动把末端质量改成某个 $m_d$。如果不同方向或不同姿态的实际质量不同，同一组刚度阻尼会产生不同的自然频率和阻尼比。
+
+对一个解耦近似方向，用有效质量 $m_{\rm eff}$ 估计 $D=2\zeta\sqrt{Km_{\rm eff}}$ 是合理起点。若任务惯量强耦合，仅把其对角元逐个套公式不保证整体模态都有指定阻尼，需考察质量与刚度组合的特征方向。
+
+\section{惯量重塑为什么需要额外信息}
+
+先取理想一维对象 $m\ddot x=u+F_{\rm ext}$。希望得到式\eqref{eq:cf_target_impedance}，由目标方程解出
+\[
+\ddot x=\ddot x_d+\frac{F_{\rm ext}-D\dot e_x-Ke_x}{m_d}.
+\]
+代回真实动力学所需的 $u=m\ddot x-F_{\rm ext}$，得到
+\begin{equation}
+u=m\ddot x_d-\frac m{m_d}(D\dot e_x+Ke_x)
++\left(\frac m{m_d}-1\right)F_{\rm ext}.
+\label{eq:cf_mass_shaping}
+\end{equation}
+当 $m_d=m$，最后一项为零，无需测外力就能保留自然惯量。想改变惯量时，控制律通常需要外力测量或估计，或者等价的加速度反馈等附加实现条件。外力噪声和延迟会经过这条通道影响稳定性。
+
+\begin{examplebox}[算例 15E 把2 kg的对象表现成1 kg]
+取真实 $m=2$、目标 $m_d=1$、$K=100$、$D=20$，当前 $e_x=0.01\,\mathrm{m}$、$\dot e_x=0$、$\ddot x_d=0$、$F_{\rm ext}=5\,\mathrm{N}$。式\eqref{eq:cf_mass_shaping}给出
+\[
+u=-2\times100\times0.01+(2-1)\times5=3\,\mathrm{N}.
+\]
+真实加速度为 $(3+5)/2=4\,\mathrm{m/s^2}$；目标方程给出 $(5-100\times0.01)/1=4$，二者相同。控制器额外沿外力方向出力，使人感觉它更轻。这也说明质量重塑可能主动注入能量，不能仅用“弹簧刚度为正”保证整个实现无源。
+\end{examplebox}
+
+\section{导纳把外力变成一个可以执行的位置目标}
+
+当机器人已有较强位置内环，外层可以运行一个虚拟模型：
+\begin{equation}
+M_d\ddot x_c+D_d\dot x_c+K_d(x_c-x_d)=F_{\rm ext}.
+\end{equation}
+这里 $x_c$ 是生成给位置控制器的目标，不是真实末端位置。只有内环能足够准确、足够及时地跟随 $x_c$，实际机器人才能接近这个导纳。外层目标、内环动态、力滤波和环境共同组成闭环，任何一项都不能省略。
+
+对固定 $x_d$，半隐式欧拉更新为
+\begin{align}
+a_k&=M_d^{-1}[F_k-D_dv_k-K_d(x_k-x_d)],\\
+v_{k+1}&=v_k+T_sa_k,\\
+x_{k+1}&=x_k+T_sv_{k+1}.
+\end{align}
+这只是一个离散实现选项，稳定性受虚拟参数、周期和真实位置环影响。若 $x_d$ 本身运动，应明确是直接使用绝对指令动力学，还是对相对偏移状态积分并叠加参考运动。
+
+\begin{examplebox}[算例 15F 手算两拍零刚度导纳]
+取 $M_d=2\,\mathrm{kg}$、$D_d=40\,\mathrm{N\,s/m}$、$K_d=0$、$T_s=0.005\,\mathrm{s}$，初始 $x_0=v_0=0$，持续推力为4 N。
+
+第一拍 $a_0=4/2=2$，故 $v_1=0.01\,\mathrm{m/s}$、$x_1=0.00005\,\mathrm{m}$。第二拍 $a_1=(4-40\times0.01)/2=1.8$，故 $v_2=0.019$、$x_2=0.000145\,\mathrm{m}$。
+
+连续理想稳态速度为 $F/D=0.1\,\mathrm{m/s}$。零刚度时持续施力会持续移动，而不是最终回到原位。若传感器存在0.5 N未补偿偏置，即使没人推也会趋于 $0.5/40=0.0125\,\mathrm{m/s}$ 的漂移速度；加入 $K=100$ 后，同一静态偏置转为5 mm的位置偏差。
+\end{examplebox}
+
+\begin{figure}[htbp]
+\centering\includegraphics[width=.95\linewidth]{figures/cf_admittance.pdf}
+\caption{零刚度导纳在持续外力下趋于恒定速度；加上位置弹簧后才会趋于有限偏移。真实位置内环和力传感器动态尚未包括在这张理想模型图中。}
+\end{figure}
+
+阻抗与导纳主要区别在因果实现：前者根据运动产生力矩，后者根据外力产生运动指令。不能给出“导纳在硬环境一定更稳定”或“阻抗碰硬物就一定稳定”的通用结论。驱动接口、回驱摩擦、位置内环、力测量和通信时延共同决定可实现范围。
+
+\section{静态接触力和撞击峰值必须分开计算}
+
+设真实墙面在 $x=0$，进入墙内的正位移为 $x>0$，环境弹簧给机器人的力为 $F_{\rm ext}=-k_ex$。虚拟目标位于墙内 $x_d>0$。静止时
+\[
+0=-K(x-x_d)-k_ex,
+\]
+因此
+\begin{equation}
+x=\frac{K}{K+k_e}x_d,
+\qquad F_{\rm contact}=k_ex=\frac{Kk_e}{K+k_e}x_d.
+\end{equation}
+$F_{\rm contact}>0$ 在这里表示压向墙的力大小，与环境对机器人的有符号力 $F_{\rm ext}$ 相反。
+
+\begin{examplebox}[算例 15G 两个弹簧串联的接触力]
+取 $K=200\,\mathrm{N/m}$、$k_e=20000\,\mathrm{N/m}$、$x_d=0.01\,\mathrm{m}$，则
+\[
+x=\frac{200}{20200}\times0.01=0.00009901\,\mathrm{m},
+\]
+\[
+F_{\rm contact}=20000x=1.9802\,\mathrm{N}.
+\]
+机器人实际只把墙压入约0.099 mm，大部分目标偏移被虚拟弹簧吸收。若直接假设理想刚性位置源把真实墙压入全部10 mm，得到的会是200 N，这对应完全不同的控制和结构假设。
+\end{examplebox}
+
+冲击峰值还取决于接触瞬间动能。对无阻尼的单质量弹性撞击模型，初速度 $v_0$ 的动能全部存入环境弹簧时，
+\[
+\tfrac12mv_0^2=\tfrac12k_e\delta_{\max}^2,
+\quad F_{\max}=k_e\delta_{\max}=v_0\sqrt{mk_e}.
+\]
+取 $m=2\,\mathrm{kg}$、$k_e=20000\,\mathrm{N/m}$、$v_0=0.1\,\mathrm{m/s}$，有 $F_{\max}=20\,\mathrm{N}$。这不是通用碰撞上界，而是展示即使稳态目标力很小，已有动能仍可造成较大的瞬时接触力。阻尼、接触材料、执行器动作和结构柔性都会改变实际峰值。
+
+\begin{figure}[htbp]
+\centering\includegraphics[width=.95\linewidth]{figures/cf_contact.pdf}
+\caption{左图是无阻尼弹性碰撞的第一接触段，右图是两个弹簧的静态平衡。速度影响冲击，刚度与目标偏移影响最终压力，两类指标不能互相代替。}
+\end{figure}
+
+\section{直接力控制与力位混合}
+
+如果已知接触方向，令 $f=k_ex$ 表示正向压缩力大小，并用
+\[
+\dot x_{\rm cmd}=k_f(f_d-f)
+\]
+生成位置指令。在理想位置跟随和始终接触的条件下，
+\[
+\dot f=k_e\dot x=k_ek_f(f_d-f),
+\]
+即时间常数为 $1/(k_ek_f)$ 的一阶力跟踪。$k_f$ 的单位是 $\mathrm{m/(N\,s)}$。环境越硬，相同增益下外力闭环越快，可能超出真实位置环和通信所能支撑的范围。
+
+\begin{examplebox}[算例 15H 环境刚度改变力环速度]
+取 $k_e=20000\,\mathrm{N/m}$、$k_f=0.0005\,\mathrm{m/(N\,s)}$，则 $k_ek_f=10\,\mathrm{s^{-1}}$，时间常数0.1 s。对5 ms前向欧拉更新，误差因子为 $1-k_ek_fT_s=0.95$。
+
+若环境刚度扩大十倍，理想时间常数缩为0.01 s，离散误差因子变成0.5。虽然这个简化离散模型仍稳定，真实位置环若没有足够带宽，就不能实现该结果。只检查 $0<k_ek_fT_s<2$ 不足以判断真实接触稳定。
+\end{examplebox}
+
+力位混合控制在任务坐标系中分配方向。例如沿平面切向 $x,y$ 跟踪位置，沿法向 $z$ 跟踪压力，可用 $S_p=\operatorname{diag}(1,1,0)$、$S_f=I-S_p$ 表示分工。$S_pF_p+S_fF_f$ 是各通道输出在共同力坐标中的组合，不是随意把位置量和力量相加。表面法向变化时，选择矩阵必须随坐标变换；完整动态解耦还与操作空间惯量和约束几何有关。
+
+某些力控制结构加积分可以消除常值偏差，但“直接力控必须含积分”不是普适定理：理想直接力矩源加正确前馈也能产生目标力。是否需要积分要由对象、传感器偏置和控制结构决定。积分进入接触过程后，同样需要限幅、抗饱和和切换时状态一致性。
+
+\section{无源性和变刚度的能量账}
+
+对固定目标、常数质量和刚度，目标阻抗的储能为
+\[
+E=\tfrac12\dot e_x^\top M_d\dot e_x+
+\tfrac12e_x^\top K_de_x.
+\]
+代入目标动力学得
+\[
+\dot E=F_{\rm ext}^\top\dot e_x-
+\dot e_x^\top D_d\dot e_x.
+\]
+外界输入的机械功率一部分存储、一部分被阻尼耗散，没有凭空产生的能量，这就是该端口模型的无源性直觉。与另一个无源系统互联时，可以利用储能关系讨论稳定与有界性；若还要得到渐近收敛，需要严格耗散或可检测性等额外条件。不能把“两个无源系统连接”直接简化为一切运动都会迅速停止。
+
+若刚度随时间变化，即使目标固定，还多出
+\[
+\tfrac12e_x^\top\dot K_de_x
+\]
+这一项。误差尚未消失时突然提高刚度，会增加虚拟势能。
+
+\begin{examplebox}[算例 15I 刚度变化需要多少能量]
+一维误差为2 cm，刚度从100提高到400 N/m，在位置未改变的瞬间，势能增加
+\[
+\Delta E=\tfrac12(0.02)^2(400-100)=0.06\,\mathrm{J}.
+\]
+如果控制设计只允许用一个剩余可用能量0.04 J的虚拟能量罐支付这次变化，那么该变化不能原样执行；应减小增量、等待阻尼积累能量或采用明确的其他能量来源。仅限制 $\dot K$ 可以让变化较平滑，却不自动证明总能量条件满足。
+\end{examplebox}
+
+数字采样、延迟、力矩估计误差、摩擦过补偿及零空间耦合都会改变实际能量收支。某些单自由度触觉装置能推导出采样刚度和物理阻尼的标量条件，但它们依赖特定采样、速度估计和控制结构，不能把某个标量公式当成所有七轴机械臂的通用刚度上限。
+
+\section{计算练习与逐步解答}
+
+\textbf{练习 1}\quad 目标有效质量3 kg，刚度300 N/m，希望阻尼比0.8。求阻尼、自然频率和6 N恒力下的偏移。
+
+\textbf{解}\quad $\omega_n=\sqrt{300/3}=10\,\mathrm{rad/s}$；$D=2\times0.8\sqrt{300\times3}=48\,\mathrm{N\,s/m}$；静态偏移 $6/300=0.02\,\mathrm{m}$。阻尼改变动态过程，不改变此静态偏移。
+
+\textbf{练习 2}\quad 零刚度导纳 $M=1.5$、$D=30$，受到3 N恒力。求最终速度和速度时间常数。
+
+\textbf{解}\quad 方程为 $1.5\dot v+30v=3$。稳态令 $\dot v=0$，得到 $v_\infty=0.1\,\mathrm{m/s}$。时间常数为 $M/D=0.05\,\mathrm{s}$。从静止开始：
+\[
+v(0.05)=0.1(1-e^{-1})=0.06321\,\mathrm{m/s}.
+\]
+
+\textbf{练习 3}\quad 实际质量4 kg，希望表现为2 kg；静止目标，$K=100$、$D=20$，当前误差0.02 m、速度误差0.1 m/s、外力8 N。求质量重塑控制力。
+
+\textbf{解}\quad 恢复项 $D\dot e+Ke=20\times0.1+100\times0.02=4\,\mathrm{N}$。由式\eqref{eq:cf_mass_shaping}，$u=-(4/2)4+(4/2-1)8=0$。真实加速度为 $(0+8)/4=2$；目标方程给 $(8-4)/2=2$，一致。
+
+\textbf{练习 4}\quad 环境刚度10000 N/m、控制刚度500 N/m，目标在表面内5 mm。求稳态压力和真实压入量。
+
+\textbf{解}\quad 真实压入量为 $x=500\times0.005/10500=0.000238095\,\mathrm{m}$；压力 $f=10000x=2.38095\,\mathrm{N}$。也可用串联等效刚度 $500\times10000/10500=476.1905\,\mathrm{N/m}$ 乘5 mm得到相同结果。
+
+\section*{本章与原稿的对应}
+本章整合 [A，第39--52页] 与 [B，第54--58、83--87页]。补足了静态偏差、移动参考、质量重塑、导纳两拍更新、接触冲击和能量变化的计算，并对阻抗与导纳的适用边界、实测加速度需求和稳定性前提作了明确限定。

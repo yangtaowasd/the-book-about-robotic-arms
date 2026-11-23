@@ -1,0 +1,257 @@
+\chapter{从反馈误差到关节伺服}
+\label{ch:feedback}
+
+本章用同一个教学关节把控制理论串起来。设关节转动惯量 $J_r=0.1\,\mathrm{kg\,m^2}$，黏性阻尼 $b=0.2\,\mathrm{N\,m\,s/rad}$，关节侧输入力矩为 $u$。这些数只用于计算，不是 NERO 的实测参数。重力已经由名义前馈抵消，剩余扰动力矩记作 $d$，正方向与关节角增大的方向相同：
+\begin{equation}
+J_r\ddot q+b\dot q=u+d.\label{eq:cf_joint}
+\end{equation}
+当我们说“控制得好”，至少要分别回答：能否稳定、目标变化时跟得多快、有外力时偏多少，以及为此用了多少力矩。一个响应曲线无法代替这四个问题。
+
+\section{反馈为什么能够纠正误差}
+
+设 $q_d$ 是目标角度，$q$ 是实际角度。本书统一定义 $e=q-q_d$。当关节比目标多转了一个正角度时，$e>0$，恢复力矩应该为负，因此比例反馈是 $u=-K_p e$，其中 $K_p>0$。如果编码器方向或电机力矩方向反了，原本的负反馈会变成正反馈，这时改变增益大小无法修正符号错误。
+
+图中采用常见的“目标减测量”加法节点，因而控制器输入为 $q_d-q=-e$；它与本书的误差定义没有矛盾。误差的定义可以二选一，整条推导必须始终一致。
+\begin{figure}[htbp]
+\centering\includegraphics[width=.95\linewidth]{figures/cf_feedback.pdf}
+\caption{带输入扰动和测量噪声的反馈结构。扰动 $d$ 作用在对象入口，噪声 $n$ 只进入测量通道，二者的闭环传递关系不同。}
+\end{figure}
+
+“闭环”是输出测量回到输入端形成回路；“开环”是指没有这条反馈通道，或为分析而把回路在某处断开。开环控制不一定差，例如精确的重力前馈很有用；但前馈无法凭空知道未建模负载发生了什么。反馈的价值是根据已经出现的偏差修正，而它的代价是测量噪声、延迟和未建模动态也进入闭环。
+
+\subsection{从微分方程得到传递函数}
+
+传递函数描述线性时不变模型在零初始状态下的输入输出关系。对式\eqref{eq:cf_joint}取拉普拉斯变换，暂令 $d=0$：
+\begin{align}
+J_r\big[s^2Q(s)-s q(0)-\dot q(0)\big]
++b\big[sQ(s)-q(0)\big]&=U(s),\\
+q(0)=\dot q(0)=0\quad\Longrightarrow\quad
+(J_rs^2+bs)Q(s)&=U(s),\\
+G_q(s)=\frac{Q(s)}{U(s)}&=\frac{1}{s(J_rs+b)}.
+\end{align}
+这里 $s$ 的量纲是每秒，$Q(s)$、$U(s)$ 是变换后的信号，不是新的物理状态。角速度 $v=\dot q$，所以速度对象为
+\begin{equation}
+G_v(s)=\frac{V(s)}{U(s)}=\frac{1}{J_rs+b}
+=\frac{5}{0.5s+1}.
+\end{equation}
+分母为零的位置称为极点。速度模型只有 $s=-2$ 这个极点，对应时间常数 $0.5\,\mathrm{s}$。位置模型还多一个零极点，因为速度必须积分才能成为位置。这个零极点意味着恒定力矩可以让位置一直增加，并不意味着电机速度会无限增加。
+
+\begin{examplebox}[算例 11A 恒定力矩产生怎样的运动]
+关节从静止开始，输入 $u=0.4\,\mathrm{N\,m}$。由 $0.1\dot v+0.2v=0.4$ 得
+\[
+v(t)=2(1-e^{-2t})\,\mathrm{rad/s}.
+\]
+在 $t=0.5\,\mathrm{s}$，$v=2(1-e^{-1})=1.2642\,\mathrm{rad/s}$。再积分：
+\[
+q(t)=2t-(1-e^{-2t}),\qquad q(0.5)=0.3679\,\mathrm{rad}.
+\]
+速度逐渐接近 $2\,\mathrm{rad/s}$，位置仍持续增加。看懂这一步，就能理解为什么位置对象和速度对象不能套用同一组增益。
+\end{examplebox}
+
+\subsection{闭环代数以及扰动的入口}
+
+设控制器传递函数为 $C(s)$，测量噪声为 $N(s)$。对象满足 $Y=G(U+D)$，控制器满足 $U=C(R-Y-N)$。逐项代入：
+\begin{align}
+Y&=GC(R-Y-N)+GD,\\
+(1+GC)Y&=GCR+GD-GCN,\\
+Y&=T R+G S D-TN,\\
+S(s)&=\frac{1}{1+GC},\qquad
+T(s)=\frac{GC}{1+GC},\qquad S+T=1.
+\end{align}
+$S$ 称为灵敏度函数，$T$ 称为互补灵敏度函数。参考信号通过 $T$ 到输出；输入端力矩扰动通过 $GS$ 到输出；测量噪声通过 $-T$ 到输出。因此“$S$ 小就能消除所有扰动”是不完整的说法，还要知道扰动从哪里进入。
+
+关系 $S+T=1$ 是复数函数的相加，不是说两个幅值之和处处等于 1；但由三角不等式可知，同一频率下不可能让 $|S|$ 和 $|T|$ 都任意小。设计通常希望低频 $T\approx1$、$S\approx0$，高频 $T\approx0$，由此在跟踪、抗扰和噪声之间分配频率范围。
+
+\section{比例和微分怎样决定响应}
+
+对静止目标采用
+\begin{equation}
+u=-K_p(q-q_d)-K_d\dot q.
+\end{equation}
+$K_p$ 的单位是 $\mathrm{N\,m/rad}$；$K_d$ 的单位是 $\mathrm{N\,m\,s/rad}$。代入对象并令 $d=0$：
+\begin{align}
+J_r\ddot q+(b+K_d)\dot q+K_pq&=K_pq_d,\\
+\frac{Q(s)}{Q_d(s)}&=
+\frac{K_p/J_r}{s^2+[(b+K_d)/J_r]s+K_p/J_r}.
+\end{align}
+把分母与标准二阶式 $s^2+2\zeta\omega_ns+\omega_n^2$ 对齐，得到
+\begin{equation}
+\omega_n=\sqrt{\frac{K_p}{J_r}},\qquad
+\zeta=\frac{b+K_d}{2\sqrt{J_rK_p}}.
+\label{eq:cf_pd_design}
+\end{equation}
+$\omega_n$ 是无阻尼自然角频率，单位 $\mathrm{rad/s}$；除以 $2\pi$ 才得到 Hz。$\zeta$ 是没有单位的阻尼比，描述能量损耗相对于振动尺度的大小。不是所有二阶系统都振荡：$0<\zeta<1$ 为欠阻尼，$\zeta=1$ 为临界阻尼，$\zeta>1$ 为过阻尼。
+
+\begin{examplebox}[算例 11B 从指标反推 PD 增益]
+希望 $\omega_n=10\,\mathrm{rad/s}$、$\zeta=0.7$。由式\eqref{eq:cf_pd_design}反解：
+\[
+K_p=J_r\omega_n^2=0.1\times100=10,
+\]
+\[
+K_d=2\zeta\omega_nJ_r-b
+=2\times0.7\times10\times0.1-0.2=1.2.
+\]
+闭环极点为 $-7\pm j\sqrt{51}=-7\pm7.1414j$。给一个 $0.1\,\mathrm{rad}$ 的位置阶跃，初始比例力矩为 $1\,\mathrm{N\,m}$。标准二阶公式给出
+\[
+M_p=e^{-\pi\zeta/\sqrt{1-\zeta^2}}=0.04599,
+\quad t_p=\frac{\pi}{10\sqrt{0.51}}=0.4399\,\mathrm{s},
+\]
+\[
+t_s\approx\frac{4}{\zeta\omega_n}=0.5714\,\mathrm{s}.
+\]
+峰值角度约为 $0.10460\,\mathrm{rad}$。调节时间这里是进入并持续留在最终值 $\pm2\%$ 带内的估算，不是精确的普适等式。额外滤波器、延迟、零点或饱和都会改变结果。
+\end{examplebox}
+
+\begin{figure}[htbp]
+\centering\includegraphics[width=.95\linewidth]{figures/cf_pd_step.pdf}
+\caption{左图改变阻尼比而保持自然频率不变；右图在同一阻尼下改变刚度。振动衰减和稳态抗扰是两个不同的问题。}
+\end{figure}
+
+\subsection{为什么越软越容易留偏差}
+
+在恒定扰动 $d_0$ 下，静止时 $\dot q=\ddot q=0$，对象方程变成
+\begin{equation}
+0=-K_p(q-q_d)+d_0,\qquad e_\infty=\frac{d_0}{K_p}.
+\end{equation}
+这不是控制器没有执行，而是虚拟弹簧的恢复力矩与扰动力矩达到了平衡。
+
+例如扰动力矩 $d_0=0.3\,\mathrm{N\,m}$，刚度 $K_p=10$，误差为 $0.03\,\mathrm{rad}$，约 $1.72^\circ$。把 $K_p$ 降为 2，误差变为 $0.15\,\mathrm{rad}$，约 $8.59^\circ$。提高刚度能压小偏差，却也增大人推动它需要的力矩。后面的辨识、重力补偿和摩擦补偿，目的正是减少 $d_0$，使较低刚度也能保持较小误差。
+
+\section{积分消除常值误差及其代价}
+
+定义积分状态 $z(t)=\int_0^t e(\xi)\,d\xi$，PID 控制写成
+\begin{equation}
+u=-K_pe-K_d\dot e-K_iz.
+\end{equation}
+$K_i$ 的单位为 $\mathrm{N\,m/(rad\,s)}$。积分记住了误差持续多久，即使误差很小，持续积累也会增加纠正力矩。对静止目标，闭环特征多项式为
+\begin{equation}
+J_rs^3+(b+K_d)s^2+K_ps+K_i=0.
+\end{equation}
+三阶 Routh 判据给出严格稳定条件：各系数为正，且
+\begin{equation}
+(b+K_d)K_p>J_rK_i.
+\end{equation}
+因此加入积分不只是多一个“消除误差”的按钮，它也多了一个状态和一个稳定性约束。
+
+\begin{examplebox}[算例 11C 积分增益不是越大越好]
+延续 $J_r=0.1$、$b+K_d=1.4$、$K_p=10$，得到
+\[
+0<K_i<\frac{1.4\times10}{0.1}=140.
+\]
+$K_i=20$ 满足该理想模型的稳定条件；$K_i=160$ 不满足。上界 140 不是实机可用增益，真实对象还有滤波、采样和柔性，通常需要更大的稳定余量。恒定扰动为 $0.3\,\mathrm{N\,m}$ 时，稳定平衡要求 $e=0$ 且 $-K_i z=-0.3$，因此 $z=0.015\,\mathrm{rad\,s}$。积分状态保存了抵消扰动所需的信息。
+\end{examplebox}
+
+\subsection{饱和后积分为什么会越积越多}
+
+设计算出的力矩为 $u_{\rm raw}$，执行器只能输出 $u_{\rm sat}=\operatorname{clip}(u_{\rm raw},-u_{\max},u_{\max})$。在大误差下，控制器可能要求 10，而执行器实际只能给 1。若积分器仍按“误差还没消失”不断累加，它相当于在积累执行器无力兑现的命令。待关节到达目标附近，积分存量仍很大，关节会越过目标。
+
+把积分贡献直接记为 $i=-K_iz$，一种反算抗饱和方法为
+\begin{equation}
+u_{\rm raw}=-K_pe-K_d\dot q+i+u_{\rm ff},\qquad
+\dot i=-K_ie+K_{\rm aw}(u_{\rm sat}-u_{\rm raw}).
+\label{eq:cf_aw}
+\end{equation}
+$K_{\rm aw}$ 的单位是 $\mathrm{s^{-1}}$。输出上饱和时，$u_{\rm sat}-u_{\rm raw}<0$，额外项把过大的正积分贡献拉下来。条件积分则只在积分会把饱和推得更深时停止积分；能够解除饱和的反向积分应继续进行。
+
+\begin{examplebox}[算例 11D 手算一次抗饱和更新]
+取 $T_s=0.005\,\mathrm{s}$、$e=-0.02\,\mathrm{rad}$、$K_i=10$、$K_{\rm aw}=20\,\mathrm{s^{-1}}$，当前 $u_{\rm raw}=1.6$、$u_{\rm sat}=1.0\,\mathrm{N\,m}$。本拍积分变化为
+\[
+\Delta i=T_s[-K_ie+K_{\rm aw}(u_{\rm sat}-u_{\rm raw})]
+=0.005[0.2-12]=-0.059\,\mathrm{N\,m}.
+\]
+如果没有抗饱和，这一拍还会增加 $0.001\,\mathrm{N\,m}$。两者方向恰好相反，因为当前最需要的是卸掉积累，而不是继续扩大命令。
+\end{examplebox}
+
+\begin{figure}[htbp]
+\centering\includegraphics[width=.95\linewidth]{figures/cf_antiwindup.pdf}
+\caption{教学关节的饱和仿真。目标为 1 rad，$K_p=10$、$K_d=1.2$、$K_i=30$，输出限制为 $\pm1\,\mathrm{N\,m}$，反算增益为 $15\,\mathrm{s^{-1}}$。比较的是同一对象和同一目标。}
+\end{figure}
+
+对测量值微分可以避免目标阶跃产生微分冲击，但这时 D 项是 $-K_d\dot q$，与轨迹误差微分 $-K_d(\dot q-\dot q_d)$ 相差 $K_d\dot q_d$。移动目标若需要速度跟踪，应明确加入这项前馈。纯微分的高频增益无限大，实际通常用 $K_ds/(1+T_fs)$，并把 $T_f$ 引入的相位变化计入闭环设计。
+
+\section{极点和频率是同一个系统的两种观察方法}
+
+\subsection{用 Routh 表算出一个稳定区间}
+
+考虑开环 $L(s)=K/[s(s+1)(s+2)]$。单位负反馈的闭环分母为
+\[
+s^3+3s^2+2s+K.
+\]
+Routh 表为
+\begin{center}
+\begin{tabular}{ccc}\toprule
+幂次 & 第一列 & 第二列\\\midrule
+$s^3$ & $1$ & $2$\\
+$s^2$ & $3$ & $K$\\
+$s^1$ & $(6-K)/3$ & $0$\\
+$s^0$ & $K$ & $0$\\\bottomrule
+\end{tabular}
+\end{center}
+第一列全正要求 $0<K<6$。$K=6$ 时，多项式可分解成 $(s+3)(s^2+2)$，其中 $\pm j\sqrt2$ 没有负实部，不能渐近衰减。根轨迹把每个 $K$ 对应的根画在复平面上，展示了这一结论。这个例子中的增益过大确实使一对极点进入右半平面，但“增加增益一定使所有系统不稳定”不是定理。
+
+\begin{figure}[htbp]
+\centering\includegraphics[width=.98\linewidth]{figures/cf_root_bode.pdf}
+\caption{同一闭环问题的根轨迹与频率响应。根轨迹上虚轴交点对应 $K=6$，频域中也能找到相同的增益边界。}
+\end{figure}
+
+\subsection{Bode 图怎样读}
+
+用正弦输入激励稳定的线性系统，稳态输出仍是同一频率，只改变幅值和相位。令 $s=j\omega$，$|G(j\omega)|$ 给幅值比例，$\arg G(j\omega)$ 给相位差。幅值常画成 $20\log_{10}|G|$，单位为 dB：幅值减半约为 $-6.02\,\mathrm{dB}$，幅值变成 $1/\sqrt2$ 约为 $-3.01\,\mathrm{dB}$。
+
+开环幅值等于 1 的频率叫增益穿越频率 $\omega_c$。在常见的单一穿越、开环没有右半平面极点等情形下，相位裕度为
+\[
+\mathrm{PM}=180^\circ+\arg L(j\omega_c).
+\]
+相位到 $-180^\circ$ 时，增益裕度为 $\mathrm{GM}=1/|L(j\omega_{180})|$。多个穿越、开环不稳定或复杂多变量系统，应使用完整 Nyquist 或相应多变量分析，不能仅看一个正的 PM 数字。
+
+闭环带宽常用 $|T(j\omega)|$ 相对于低频增益下降 3 dB 的频率来定义。它与开环穿越频率通常同量级，但并不相等；它更不等于控制程序每秒运行多少次。
+
+\begin{examplebox}[算例 11E 一个可手算的速度 PI 设计]
+速度对象为 $G_v=1/(0.1s+0.2)$，取 $C_v=2+8/s=2(1+4/s)$。在 $\omega=20\,\mathrm{rad/s}$：
+\[
+|G_v|=\frac{1}{\sqrt{0.2^2+2^2}}=0.4975,
+\qquad |C_v|=\sqrt{2^2+0.4^2}=2.0396.
+\]
+乘积约为 1.015，因此穿越频率就在 20 附近。对象相位为 $-\arctan(10)=-84.29^\circ$，PI 相位为 $-\arctan(0.2)=-11.31^\circ$。若总等效延迟为 $7.5\,\mathrm{ms}$，额外相位约为 $-20\times0.0075\times180/\pi=-8.59^\circ$。
+
+由此估计 PM 约为 $75.8^\circ$。数值求根得到实际穿越频率 $20.2867\,\mathrm{rad/s}=3.2287\,\mathrm{Hz}$，计入该延迟后的 PM 为 $75.76^\circ$。这仍只是当前刚体一阶模型的设计结果；若速度测量有滤波或存在柔性模态，须把它们放入同一个开环模型。
+\end{examplebox}
+
+\section{电流速度位置三环怎样分工}
+
+电流环的输出是电压或 PWM，占空比改变电流；速度环的输出是电流或力矩目标；位置环的输出常是速度目标。只有先问清每个接口的输入输出单位，才有资格比较两个参数都叫 $K_p$ 的控制器。
+
+若电流内环的简化对象为 $G_i=1/(Ls+R_e)$，PI 控制器为 $(K_{pi}s+K_{ii})/s$，选择 $K_{ii}/K_{pi}=R_e/L$，名义开环化成 $K_{pi}/(Ls)$。若希望其名义闭环极点为 $-\omega_i$，则
+\[
+K_{pi}=L\omega_i,\qquad K_{ii}=R_e\omega_i.
+\]
+这个推导假设电感电阻模型有效，反电动势和耦合已妥善处理，且忽略数字延迟。它说明参数的由来，不能把零极点对消当作消除实物动态的魔法。尤其不能靠精确对消隐藏不稳定极点。
+
+当速度内环足够快时，位置外环可近似为 $\dot q=v_{\rm cmd}$。取
+\begin{equation}
+v_{\rm cmd}=\dot q_d-K_q(q-q_d)
+\end{equation}
+便有 $\dot e=-K_qe$。这里 $K_q$ 的单位是 $\mathrm{s^{-1}}$，与直接输出力矩的比例增益不同。若省略速度前馈，只用 $v_{\rm cmd}=-K_qe$，对匀速目标 $\dot q_d=v_d$，稳态误差为 $e_\infty=-v_d/K_q$。
+
+\begin{examplebox}[算例 11F 速度前馈消除跟随落后]
+外环 $K_q=5\,\mathrm{s^{-1}}$，期望匀速 $v_d=0.2\,\mathrm{rad/s}$。没有前馈时，实际关节必须落后 $0.04\,\mathrm{rad}$，比例项才能产生 $0.2\,\mathrm{rad/s}$ 的指令。加入 $\dot q_d$ 后，在理想速度内环下即使 $e=0$ 也能继续运动。
+
+前馈改善了已知参考的跟踪，并没有增加反馈开环的积分器个数。因此不能把“加速度前馈”直接称作“系统变为二型”；系统型别描述的是反馈开环在原点的积分结构。
+\end{examplebox}
+
+\section{计算练习与逐步解答}
+
+\textbf{练习 1}\quad $J_r=0.2$、$b=0.3$，希望 $\omega_n=8\,\mathrm{rad/s}$、$\zeta=1$。求直接力矩 PD 的 $K_p,K_d$，并求 $0.16\,\mathrm{N\,m}$ 恒定扰动造成的静态误差。
+
+\textbf{解}\quad $K_p=0.2\times8^2=12.8\,\mathrm{N\,m/rad}$；$K_d=2\times1\times8\times0.2-0.3=2.9\,\mathrm{N\,m\,s/rad}$。静止平衡 $K_pe=d$，故 $e=0.16/12.8=0.0125\,\mathrm{rad}=0.7162^\circ$。阻尼改变瞬态，但不出现在静态误差公式中。
+
+\textbf{练习 2}\quad 对教学关节取 $K_p=5$、$K_d=0.8$。在理想连续 PID 模型下，积分增益的稳定范围是什么？
+
+\textbf{解}\quad 特征式为 $0.1s^3+(0.2+0.8)s^2+5s+K_i$。系数为正要求 $K_i>0$，Routh 条件要求 $1\times5>0.1K_i$，所以 $0<K_i<50$。在 $K_i=50$ 的边界处不能当作严格稳定。
+
+\textbf{练习 3}\quad 速度前馈比例只有 80\%，控制律 $v_{\rm cmd}=0.8v_d-K_qe$。取 $K_q=4\,\mathrm{s^{-1}}$、$v_d=0.1\,\mathrm{rad/s}$，求稳态误差。
+
+\textbf{解}\quad $\dot e=v_{\rm cmd}-v_d=-0.2v_d-K_qe$。稳态令 $\dot e=0$，得到 $e=-0.2\times0.1/4=-0.005\,\mathrm{rad}$。关节仍略落后，但比完全没有前馈时的 $-0.025\,\mathrm{rad}$ 小五倍。
+
+\section*{本章与原稿的对应}
+本章整合 [A，第5--14、34--38页] 与 [B，第59--63页]。补足了扰动入口的代数推导、增益单位、抗饱和逐拍计算，并修正“前馈改变系统型别”和“增加增益总会把极点推向不稳定”的过度概括。

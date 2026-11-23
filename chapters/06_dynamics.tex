@@ -1,0 +1,375 @@
+\chapter{从能量逐步建立机械臂动力学}\label{ch:dynamics}
+\section{动力学究竟要回答什么}
+运动学给出关节角与末端位置之间的关系。动力学进一步回答：沿着这条运动轨迹，驱动器要输出多大力矩；当人推了一下机械臂，关节又会怎样加速。前一个问题叫逆动力学（inverse dynamics），后一个叫正动力学（forward dynamics）。这里的“正”和“逆”是输入与输出的方向，不代表计算难度或正确与错误。
+
+本章采用如下统一模型：
+\begin{equation}\label{eq:full_dynamics_di}
+ M(q)\ddot q+C(q,\dot q)\dot q+g(q)+\tau_f=\tau_{\mathrm{cmd}}+\tau_{\mathrm{ext}}.
+\end{equation}
+其中，$q\in\mathbb R^n$ 是 $n$ 个关节角组成的列向量，$\dot q$、$\ddot q$ 分别是关节角速度和角加速度；$M\in\mathbb R^{n\times n}$ 是惯量矩阵；$C\dot q$ 是速度耦合力矩；$g$ 是抵消重力所需的力矩；$\tau_f$ 是写在方程左侧的摩擦阻力矩；$\tau_{\mathrm{cmd}}$ 是驱动器实际作用于关节的力矩；$\tau_{\mathrm{ext}}$ 是环境作用于机械臂的外力矩。这里的“实际”很重要：驱动器收到的指令与执行器真正实现的力矩可能因限流、延迟、标定误差而不同。
+
+对转动关节，角度、角速度、角加速度的单位分别写作 $\mathrm{rad}$、$\mathrm{rad/s}$、$\mathrm{rad/s^2}$，力矩用 $\mathrm{N\,m}$。惯量单位是 $\mathrm{kg\,m^2}$。弧度在量纲分析中视为无量纲，但工程接口仍必须标明弧度，避免把角度制数字直接代入。
+
+\begin{conceptbox}[各项的直觉]
+$M\ddot q$ 是“要加速就要出力”；$C\dot q$ 是“各连杆运动会互相影响”；$g$ 是“举住自身和负载的重量”；$\tau_f$ 是“克服轴承、密封、传动和接触的阻力”。低速时，速度耦合常变小，但加速度未必小：缓慢运动在急停瞬间仍可能有很大的惯性力矩。判断能否忽略某一项，应比较它的数值与允许的力矩误差。
+\end{conceptbox}
+
+给定状态和力矩，正动力学是解线性方程
+\begin{equation}
+ M(q)\ddot q=\tau_{\mathrm{cmd}}+\tau_{\mathrm{ext}}-C(q,\dot q)\dot q-g(q)-\tau_f.
+\end{equation}
+数学上可以写 $M^{-1}$，程序中应解方程，不应每个周期显式求逆。得到加速度后，数值积分器再更新速度、位置。逆动力学则直接按式\eqref{eq:full_dynamics_di}逐项计算所需力矩。
+
+\section{一个刚体为什么需要质量 质心与惯量}
+\subsection{质量决定平动惯性 转动惯量决定转动惯性}
+一个质量为 $m$ 的点，以速度 $v$ 平动时，动能为 $\tfrac12 mv^2$。它绕某根轴转动，离轴距离为 $r$，则 $v=r\omega$，所以
+\begin{equation}
+ T=\frac12m(r\omega)^2=\frac12(mr^2)\omega^2.
+\end{equation}
+括号里的 $mr^2$ 就是这个点对该轴的转动惯量。物体由许多小质量组成时，把它们相加得到 $I=\int r^2\,dm$。质量离轴越远，转动惯量越大；相同质量并不意味着相同转动惯量。
+
+质心（center of mass）是质量的加权平均位置。考虑三个质量点，其质量与横坐标分别为
+\[
+ (m_1,m_2,m_3)=(1,2,1)\ \mathrm{kg},\quad
+ (x_1,x_2,x_3)=(0,0.1,0.4)\ \mathrm m.
+\]
+总质心的横坐标为
+\begin{equation}
+ c_x=\frac{1\times0+2\times0.1+1\times0.4}{1+2+1}=0.15\ \mathrm m.
+\end{equation}
+不是把三个位置简单平均，而是质量越大权重越大。
+
+\subsection{从一个惯量数到惯量张量}
+三维空间中，物体绕不同轴转动需要不同的力矩。用对称矩阵 $I_C$ 描述它绕质心的转动惯性：
+\begin{equation}
+ I_C=\int\left(\|r\|^2I_3-rr^{\mathsf T}\right)dm
+ =\begin{bmatrix}I_{xx}&I_{xy}&I_{xz}\\I_{xy}&I_{yy}&I_{yz}\\I_{xz}&I_{yz}&I_{zz}\end{bmatrix}.
+\end{equation}
+$C$ 表示质心，$I_3$ 表示三阶单位矩阵，$r$ 是相对于质心的位置。按这个定义，$I_{xy}=-\int xy\,dm$；某些教材把“惯性积”定义成正的 $\int xy\,dm$，组装矩阵时再加负号，因此跨资料比较必须核对定义。
+
+惯量矩阵的特征向量给出主惯量轴，沿这些互相垂直的方向表达时，矩阵为对角阵；三个特征值就是主惯量。矩阵对称意味着六个数即可独立决定它。加上质量一个数、质心三个数，一个刚体的惯性描述共有十个独立标量。质心坐标、惯量参考点和表达坐标系必须同时说明。只有数值而没有坐标约定的惯量不能可靠地用于控制。
+
+在与物体固连、原点位于质心的坐标系中，牛顿欧拉方程写作
+\begin{equation}
+ f_C=m a_C,\qquad m_C=I_C\dot\omega+\omega\times(I_C\omega).
+\end{equation}
+$f_C$ 是合外力，$m_C$ 是关于质心的合外力矩，$\omega$ 是角速度；这里 $\dot\omega$ 为角加速度在同一坐标系的分量。第二项是陀螺项。若 $\omega$ 恰沿主惯量轴，$I_C\omega$ 与 $\omega$ 平行，叉乘为零；其他方向一般不为零。
+
+\begin{examplebox}[算例 6A 陀螺力矩可以在角速度恒定时存在]
+取 $I_C=\operatorname{diag}(0.01,0.02,0.03)\ \mathrm{kg\,m^2}$，$\omega=(1,2,0)^{\mathsf T}\ \mathrm{rad/s}$，并令 $\dot\omega=0$。先算
+\[
+ I_C\omega=(0.01,0.04,0)^{\mathsf T}.
+\]
+再算叉乘
+\[
+ \omega\times(I_C\omega)=(0,0,1\times0.04-2\times0.01)^{\mathsf T}=(0,0,0.02)^{\mathsf T}\ \mathrm{N\,m}.
+\]
+所以恒定角速度并不自动意味着合力矩为零。原因是角动量与角速度不平行，而物体坐标轴本身在转动。
+\end{examplebox}
+
+\subsection{平行轴定理与坐标旋转}
+已知绕质心的惯量 $I_C$，质心相对于坐标原点 $O$ 的位置是 $c$，则绕 $O$ 的惯量为
+\begin{equation}\label{eq:parallel_di}
+ I_O=I_C+m\left((c^{\mathsf T}c)I_3-cc^{\mathsf T}\right).
+\end{equation}
+可从定义直接推导：把相对 $O$ 的位置写成 $r_O=c+r_C$，代入惯量积分；含 $r_C$ 的一次项因为 $\int r_Cdm=0$ 消失，剩下式\eqref{eq:parallel_di}。这也说明平行轴定理为什么必须以质心为出发点。
+
+\begin{examplebox}[算例 6B 半米均匀杆的惯量]
+一根均匀细杆质量 $1\ \mathrm{kg}$，长 $0.5\ \mathrm m$，绕垂直杆且通过中点的轴：
+\[
+ I_C=\frac{ml^2}{12}=\frac{0.25}{12}=0.0208333\ \mathrm{kg\,m^2}.
+\]
+换到端点，$c=0.25\ \mathrm m$，所以
+\[
+ I_O=0.0208333+1\times0.25^2=0.0833333\ \mathrm{kg\,m^2}.
+\]
+端点惯量是中点惯量的四倍。把这两个数弄反，会明显改变加速力矩，但静止时的重力补偿可能仍看不出错误。
+\end{examplebox}
+
+若原点不变，只把表达坐标从 $B$ 换到 $A$，则 $I_A=R_{AB}I_BR_{AB}^{\mathsf T}$。平移要用平行轴定理，旋转要用矩阵共轭，不能只把惯量矩阵的对角线交换。
+
+\section{用同一台两连杆机械臂贯穿推导}
+本章选择竖直平面内的两根均匀细杆，而不是把质量集中在杆端。几何与参数为
+\[
+ l_1=l_2=0.5\ \mathrm m,\quad m_1=m_2=1\ \mathrm{kg},\quad
+ c_1=c_2=0.25\ \mathrm m,\quad I_1=I_2=\frac1{48}\ \mathrm{kg\,m^2}.
+\]
+$c_i$ 是第 $i$ 根杆从近端关节到质心的距离；$I_i$ 是绕该杆质心、垂直运动平面的转动惯量。$q_1$ 从水平正 $x$ 方向逆时针测量，$q_2$ 是第二杆相对于第一杆的转角。重力沿负 $y$，大小 $g_0=9.81\ \mathrm{m/s^2}$。
+
+\begin{figure}[htbp]\centering
+\includegraphics[width=0.82\linewidth,height=0.37\textheight,keepaspectratio]{figures/di_2r_geometry.pdf}
+\caption{两连杆模型中的关节角、质心、重力和水平力臂。质量在质心处，而转动动能仍需要质心惯量。}\label{fig:di_2r_geometry}
+\end{figure}
+
+原稿中的部分算例采用“质量在杆端”的模型，所得数字与本章不同是模型不同，并非算式互相矛盾。教学时必须先确定质量分布，再谈惯量矩阵是否正确。
+
+\subsection{第一步 写出两个质心的位置}
+记 $q_{12}=q_1+q_2$，则
+\begin{align}
+ p_{C1}&=\begin{bmatrix}c_1\cos q_1\\c_1\sin q_1\end{bmatrix},\\
+ p_{C2}&=\begin{bmatrix}l_1\cos q_1+c_2\cos q_{12}\\l_1\sin q_1+c_2\sin q_{12}\end{bmatrix}.
+\end{align}
+对时间求导，使用 $\frac d{dt}\cos q=-\sin q\,\dot q$，得
+\begin{align}
+ v_{C1}&=\begin{bmatrix}-c_1\sin q_1\dot q_1\\c_1\cos q_1\dot q_1\end{bmatrix},\\
+ v_{C2}&=\begin{bmatrix}-l_1\sin q_1\dot q_1-c_2\sin q_{12}(\dot q_1+\dot q_2)\\
+ l_1\cos q_1\dot q_1+c_2\cos q_{12}(\dot q_1+\dot q_2)\end{bmatrix}.
+\end{align}
+把横纵分量平方后相加；利用 $\sin^2q+\cos^2q=1$ 以及 $\cos a\cos b+\sin a\sin b=\cos(a-b)$，得到
+\begin{align}
+ \|v_{C1}\|^2&=c_1^2\dot q_1^2,\\
+ \|v_{C2}\|^2&=l_1^2\dot q_1^2+c_2^2(\dot q_1+\dot q_2)^2
+ +2l_1c_2\cos q_2\dot q_1(\dot q_1+\dot q_2).
+\end{align}
+最后一项来自两部分速度的内积，正是后来出现关节耦合的来源。
+
+\subsection{第二步 平动与转动动能都要算}
+两杆的绝对角速度分别为 $\dot q_1$、$\dot q_1+\dot q_2$。总动能是
+\begin{align}
+ T={}&\tfrac12m_1\|v_{C1}\|^2+\tfrac12I_1\dot q_1^2
+ +\tfrac12m_2\|v_{C2}\|^2+\tfrac12I_2(\dot q_1+\dot q_2)^2.
+\end{align}
+为减少重复，定义三个常数
+\begin{equation}
+ a=I_1+I_2+m_1c_1^2+m_2(l_1^2+c_2^2),\quad
+ b=m_2l_1c_2,\quad d=I_2+m_2c_2^2.
+\end{equation}
+把平方展开并按 $\dot q_1^2$、$\dot q_1\dot q_2$、$\dot q_2^2$ 收集：
+\begin{equation}\label{eq:T_2r_di}
+ T=\frac12(a+2b\cos q_2)\dot q_1^2
+ +(d+b\cos q_2)\dot q_1\dot q_2+\frac12d\dot q_2^2.
+\end{equation}
+势能等于质量乘重力加速度乘高度：
+\begin{equation}
+ V=g_0\left[(m_1c_1+m_2l_1)\sin q_1+m_2c_2\sin(q_1+q_2)\right].
+\end{equation}
+高度零点任选，只要一致；给势能加一个常数不改变其导数，因此不改变力矩。
+
+\subsection{第三步 对关节一完整执行欧拉拉格朗日运算}
+拉格朗日函数 $L=T-V$。忽略摩擦和外部接触时，广义力矩满足
+\begin{equation}
+ \frac d{dt}\left(\frac{\partial L}{\partial\dot q_i}\right)
+ -\frac{\partial L}{\partial q_i}=\tau_i.
+\end{equation}
+先对 $\dot q_1$ 求偏导：
+\[
+ \frac{\partial L}{\partial\dot q_1}
+ =(a+2b\cos q_2)\dot q_1+(d+b\cos q_2)\dot q_2.
+\]
+系数含 $q_2(t)$，所以对时间求导时必须使用乘积法则：
+\begin{align}
+ \frac d{dt}\frac{\partial L}{\partial\dot q_1}
+ ={}&(a+2b\cos q_2)\ddot q_1+(d+b\cos q_2)\ddot q_2\\
+ &-2b\sin q_2\dot q_1\dot q_2-b\sin q_2\dot q_2^2.
+\end{align}
+动能不含 $q_1$，因此 $\partial L/\partial q_1=-\partial V/\partial q_1$。算出
+\[
+ \frac{\partial V}{\partial q_1}
+ =g_0[(m_1c_1+m_2l_1)\cos q_1+m_2c_2\cos(q_1+q_2)].
+\]
+于是关节一方程为
+\begin{align}
+ \tau_1={}&(a+2b\cos q_2)\ddot q_1+(d+b\cos q_2)\ddot q_2\\
+ &-b\sin q_2(2\dot q_1\dot q_2+\dot q_2^2)+\frac{\partial V}{\partial q_1}.
+\end{align}
+
+\subsection{第四步 对关节二求导并观察抵消项}
+对 $\dot q_2$ 求偏导再求时间导数：
+\begin{align}
+ \frac{\partial L}{\partial\dot q_2}&=(d+b\cos q_2)\dot q_1+d\dot q_2,\\
+ \frac d{dt}\frac{\partial L}{\partial\dot q_2}
+ &=(d+b\cos q_2)\ddot q_1+d\ddot q_2-b\sin q_2\dot q_1\dot q_2.
+\end{align}
+这次动能含 $q_2$，所以
+\begin{align}
+ \frac{\partial L}{\partial q_2}
+ &=-b\sin q_2\dot q_1^2-b\sin q_2\dot q_1\dot q_2
+ -m_2c_2g_0\cos(q_1+q_2).
+\end{align}
+两式相减，含 $\dot q_1\dot q_2$ 的项正好抵消，得
+\begin{equation}
+ \tau_2=(d+b\cos q_2)\ddot q_1+d\ddot q_2
+ +b\sin q_2\dot q_1^2+m_2c_2g_0\cos(q_1+q_2).
+\end{equation}
+因此
+\begin{align}\label{eq:2rM_di}
+ M&=\begin{bmatrix}a+2b\cos q_2&d+b\cos q_2\\d+b\cos q_2&d\end{bmatrix},\\
+ c(q,\dot q):=C\dot q&=\begin{bmatrix}-b\sin q_2(2\dot q_1\dot q_2+\dot q_2^2)\\b\sin q_2\dot q_1^2\end{bmatrix},\\
+ g&=g_0\begin{bmatrix}(m_1c_1+m_2l_1)\cos q_1+m_2c_2\cos(q_1+q_2)\\m_2c_2\cos(q_1+q_2)\end{bmatrix}.
+\end{align}
+用小写 $c(q,\dot q)$ 表示整个速度力矩向量，可以避免误以为 $C$ 是唯一的。满足 $C\dot q=c$ 的矩阵不唯一；稳定性证明常使用由克里斯托费尔符号构造的特定 $C$。
+
+\begin{examplebox}[算例 6C 一次算完惯性 速度与重力力矩]
+本章参数给出 $a=5/12$、$b=1/8$、$d=1/12$。令
+\[
+ q=(0,\pi/2)^{\mathsf T},\quad\dot q=(0.2,-0.1)^{\mathsf T},\quad
+ \ddot q=(0.5,-0.2)^{\mathsf T}.
+\]
+此时 $\cos q_2=0$、$\sin q_2=1$，所以
+\[
+ M=\begin{bmatrix}0.4166667&0.0833333\\0.0833333&0.0833333\end{bmatrix}.
+\]
+惯性力矩逐行相乘：
+\[
+ M\ddot q=\begin{bmatrix}0.4166667\times0.5-0.0833333\times0.2\\0.0833333\times0.5-0.0833333\times0.2\end{bmatrix}
+ =\begin{bmatrix}0.1916667\\0.025\end{bmatrix}.
+\]
+速度项是
+\[
+ c=\begin{bmatrix}-0.125(2\times0.2\times(-0.1)+(-0.1)^2)\\0.125\times0.2^2\end{bmatrix}
+ =\begin{bmatrix}0.00375\\0.005\end{bmatrix}.
+\]
+重力项为 $g=(7.3575,0)^{\mathsf T}$，因此不计摩擦和外力时
+\[
+ \tau_{\mathrm{cmd}}=(7.5529167,0.0300000)^{\mathsf T}\ \mathrm{N\,m}.
+\]
+关节二的重力项为零，只意味着重力对它没有力臂，不意味着这个关节在运动时不用出力。
+\end{examplebox}
+
+\section{三个必须理解的结构性质}
+\subsection{惯量矩阵为什么对称正定}
+式\eqref{eq:T_2r_di}可以写成 $T=\tfrac12\dot q^{\mathsf T}M\dot q$。动能是各连杆平动与转动动能之和，因此正常刚体模型对任何非零有效速度都具有正动能，即 $\dot q^{\mathsf T}M\dot q>0$。这叫正定性。矩阵的交叉项来自同一个速度内积，所以 $M=M^{\mathsf T}$。
+
+在算例姿态下，$M_{11}>0$ 且
+\[
+ \det M=\frac5{12}\frac1{12}-\left(\frac1{12}\right)^2=\frac1{36}>0,
+\]
+所以两阶矩阵正定。某个辨识结果使 $M$ 有负特征值，就意味着某个速度方向的“动能”为负，已经违反该机械模型的物理意义。
+
+\subsection{科氏离心项参与能量交换 不能简单说它不做功}
+对本模型，可选
+\begin{equation}
+ C=\begin{bmatrix}-h\dot q_2&-h(\dot q_1+\dot q_2)\\h\dot q_1&0\end{bmatrix},\qquad h=b\sin q_2.
+\end{equation}
+直接对 $M$ 求时间导数：
+\[
+ \dot M=\begin{bmatrix}-2h\dot q_2&-h\dot q_2\\-h\dot q_2&0\end{bmatrix}.
+\]
+于是
+\[
+ \dot M-2C=\begin{bmatrix}0&h(2\dot q_1+\dot q_2)\\-h(2\dot q_1+\dot q_2)&0\end{bmatrix}.
+\]
+这确实反对称，即转置等于自身负值。对任意实向量 $z$，$z^{\mathsf T}(\dot M-2C)z=0$。
+
+不过，这并不意味着 $\dot q^{\mathsf T}C\dot q=0$。正确关系是
+\begin{equation}
+ \dot q^{\mathsf T}C\dot q=\frac12\dot q^{\mathsf T}\dot M\dot q.
+\end{equation}
+右侧通常非零，表示惯量随构型变化引起的动能交换。在算例 6C 中，$\dot q^{\mathsf T}c=0.2\times0.00375-0.1\times0.005=0.00025\ \mathrm W$，就不是零。
+
+\subsection{从动力学严格得到能量平衡}
+对总机械能 $E=T+V$ 求导：
+\begin{align}
+ \dot E&=\dot q^{\mathsf T}M\ddot q+\tfrac12\dot q^{\mathsf T}\dot M\dot q+\dot q^{\mathsf T}g\\
+ &=\dot q^{\mathsf T}(\tau_{\mathrm{cmd}}+\tau_{\mathrm{ext}}-\tau_f)
+ +\tfrac12\dot q^{\mathsf T}(\dot M-2C)\dot q\\
+ &=\dot q^{\mathsf T}(\tau_{\mathrm{cmd}}+\tau_{\mathrm{ext}})-\dot q^{\mathsf T}\tau_f.
+\end{align}
+这条式子说明：执行器与环境输入的功率增加机械能；耗散摩擦消耗机械能。所谓机械系统的无源性，核心就是它不能无缘无故创造能量。后续讨论阻抗控制、力反馈稳定性时，将反复使用这条能量关系。
+
+\section{外力怎样变成关节力矩}
+末端受到平面外力 $f=(f_x,f_y)^{\mathsf T}$，若 $J$ 满足 $\dot p=J\dot q$，由虚功相等得到
+\[
+ f^{\mathsf T}\delta p=\tau_{\mathrm{ext}}^{\mathsf T}\delta q,\qquad
+ \delta p=J\delta q,
+\]
+所以
+\begin{equation}
+ \tau_{\mathrm{ext}}=J^{\mathsf T}f.
+\end{equation}
+这是雅可比转置来自物理功率一致性的原因。三维时将速度扩展为 $[v;\omega]$、力旋量扩展为 $[f;m]$；两者必须关于同一点且在同一坐标系表达。
+
+\begin{examplebox}[算例 6D 人向下拉末端时执行器要多出多少力矩]
+在 $q=(0,\pi/2)$ 时，$J=\begin{bmatrix}-0.5&-0.5\\0.5&0\end{bmatrix}$。令环境作用力 $f=(2,-3)^{\mathsf T}\ \mathrm N$，则
+\[
+ \tau_{\mathrm{ext}}=\begin{bmatrix}-0.5&0.5\\-0.5&0\end{bmatrix}
+ \begin{bmatrix}2\\-3\end{bmatrix}=\begin{bmatrix}-2.5\\-1\end{bmatrix}\ \mathrm{N\,m}.
+\]
+若仍要实现算例 6C 的运动，动力学要求
+\[
+ \tau_{\mathrm{cmd}}=M\ddot q+c+g-\tau_{\mathrm{ext}}
+ =(10.0529167,1.0300000)^{\mathsf T}\ \mathrm{N\,m}.
+\]
+外力写在方程右侧，因而反算执行器力矩时要减去它。把这个符号弄反，会使控制器在受推时进一步加速。
+\end{examplebox}
+
+\section{用质心雅可比把推导推广到任意关节数}
+两连杆中的求导并不是只能用于平面。对第 $i$ 个三维连杆，设其质心线速度和角速度满足
+\[
+ v_{Ci}=J_{vi}(q)\dot q,\qquad\omega_i=J_{\omega i}(q)\dot q.
+\]
+$J_{vi}$、$J_{\omega i}$ 都有三行、$n$ 列；如果全部向量在基座系表达，惯量也必须写成同一坐标系的 $I_{Ci}^B=R_{Bi}I_{Ci}^iR_{Bi}^{\mathsf T}$。该连杆动能为
+\begin{align}
+ T_i&=\tfrac12m_i\dot q^{\mathsf T}J_{vi}^{\mathsf T}J_{vi}\dot q
+ +\tfrac12\dot q^{\mathsf T}J_{\omega i}^{\mathsf T}I_{Ci}^BJ_{\omega i}\dot q.
+\end{align}
+对所有连杆相加，可直接读出惯量矩阵：
+\begin{equation}
+ M(q)=\sum_i\left(m_iJ_{vi}^{\mathsf T}J_{vi}
+ +J_{\omega i}^{\mathsf T}I_{Ci}^BJ_{\omega i}\right).
+\end{equation}
+每一项都把某根杆的物理惯性通过速度映射换到关节空间。这个公式同时解释了为什么同一末端负载会影响上游多个关节，以及为什么 $M$ 的非对角元素不能普遍忽略。计算某根杆的质心雅可比时，它下游的关节不会移动这根杆，因此相应列为零；这个机构树结构使递归算法能够避免无用计算。
+
+若基座系重力加速度为常向量 $a_g^B$，势能可写为
+\[
+ V(q)=-\sum_i m_i(a_g^B)^{\mathsf T}p_{Ci}(q).
+\]
+对 $q$ 求导得到补偿重力的关节向量：
+\begin{equation}
+ g(q)=-\sum_i J_{vi}^{\mathsf T}m_i a_g^B.
+\end{equation}
+例如本章重力沿负 $y$，负号与 $a_g^B=(0,-9.81,0)$ 相乘，使水平杆的补偿力矩为正。换基座安装方向时，必须同步改变重力在基座系中的表示，而不是在某一个关节公式前随意改符号。
+
+如果已经得到 $M(q)$，还可用克里斯托费尔系数组装一个具有所需能量性质的 $C$：
+\begin{equation}
+ C_{ij}=\sum_k\frac12\left(\frac{\partial M_{ij}}{\partial q_k}
+ +\frac{\partial M_{ik}}{\partial q_j}
+ -\frac{\partial M_{jk}}{\partial q_i}\right)\dot q_k.
+\end{equation}
+三个偏导项分别来自对动能执行乘积法则以及减去位置偏导。公式里的 $i,j,k$ 都是关节索引，不是三维空间坐标。把它代回 $C\dot q$，应与直接用拉格朗日求出的速度力矩一致。真实计算通常使用解析或自动微分和递归算法；粗糙地对 $M$ 做数值差分可能把差分误差注入控制器。
+
+由这些关系可以形成一套有物理意义的实现核对：质心速度应与质心位置的差分一致；两种动能算法应一致；势能的梯度应与重力补偿一致；$\dot M-2C$ 应满足相应反对称性质。它们比只检查“机器人是否动了”更能定位错误发生在几何、惯量参考点还是求导环节。
+
+\section{从手推两关节到计算七关节}
+拉格朗日方法适合理解结构和核对小模型，但七关节完整展开会非常长。递归牛顿欧拉算法 RNEA 的思路仍是本章的物理：第一遍从基座到末端传播各杆速度、加速度；第二遍从末端到基座汇总每根杆的惯性力、重力和下游传递的力，再投影到关节轴得到力矩。它避免展开所有三角函数。
+
+\begin{figure}[htbp]\centering
+\includegraphics[width=0.89\linewidth]{figures/di_inertia_energy.pdf}
+\caption{同一两连杆模型的惯量随肘角变化，以及在不同速度组合下的动能。每条曲线均由本章显式模型计算。}\label{fig:di_inertia_energy}
+\end{figure}
+
+CRBA 计算惯量矩阵，ABA 求正动力学，它们与 RNEA 是不同任务的高效算法。可以用下面三个恒等关系检查一个动力学实现：
+\begin{align}
+ g(q)&=\operatorname{ID}(q,0,0),\\
+ c(q,\dot q)&=\operatorname{ID}(q,\dot q,0)-g(q),\\
+ M(q)e_i&=\operatorname{ID}(q,0,e_i)-g(q).
+\end{align}
+$e_i$ 是第 $i$ 个分量为一、其他为零的单位向量；最后一式返回 $M$ 的第 $i$ 列。这些关系指同一个刚体惯性模型。若某个库在逆动力学里额外加入摩擦或其他被动力，比较时必须使用一致约定。
+
+\section{计算练习与分步解答}
+\subsection*{练习 6.1 水平伸直需要多少重力补偿}
+令本章两杆 $q_1=q_2=0$，求两个关节的静态重力力矩。
+
+\textbf{解答。}关节一看到杆一质心的水平力臂 $0.25$，杆二质心的水平力臂 $0.5+0.25=0.75$，所以 $g_1=9.81(0.25+0.75)=9.81\ \mathrm{N\,m}$。关节二只看到杆二，$g_2=9.81\times0.25=2.4525\ \mathrm{N\,m}$。代入本章矩阵公式也应得到相同结果。
+
+\subsection*{练习 6.2 扣除重力后求加速度}
+在 $q=(0,\pi/2)$、$\dot q=0$ 时，执行器比重力补偿多输出 $(0.1,0)^{\mathsf T}\ \mathrm{N\,m}$，忽略摩擦，求加速度。
+
+\textbf{解答。}解 $\begin{bmatrix}5/12&1/12\\1/12&1/12\end{bmatrix}\ddot q=(0.1,0)^{\mathsf T}$。第二行给 $\ddot q_2=-\ddot q_1$；代入第一行，$(4/12)\ddot q_1=0.1$，所以 $\ddot q_1=0.3$、$\ddot q_2=-0.3\ \mathrm{rad/s^2}$。只给关节一附加力矩，关节二也会加速，这就是动力学耦合。
+
+\subsection*{练习 6.3 用动能检查矩阵}
+在算例 6C 的姿态和速度下，求总动能。
+
+\textbf{解答。}先算 $M\dot q=(0.075,0.0083333)^{\mathsf T}$，再算
+\[
+ T=\tfrac12(0.2\times0.075-0.1\times0.0083333)=0.00708333\ \mathrm J.
+\]
+分别计算各质心平动与杆转动动能后相加，也应得到这个数。两种方式不一致时，常见原因是漏掉质心转动惯量或把相对角速度误当成第二杆的绝对角速度。
+
+\subsection*{练习 6.4 位于端点的质量与均匀杆为什么不同}
+若把两根杆各自的 $1\ \mathrm{kg}$ 质量全部集中在远端，几何长度不变，求 $q=(0,\pi/2)$ 下的 $M$ 和 $g$。
+
+\textbf{解答。}此时 $c_1=c_2=0.5$，$I_1=I_2=0$。重新计算 $a=0.75$、$b=0.25$、$d=0.25$，因此 $M=\begin{bmatrix}0.75&0.25\\0.25&0.25\end{bmatrix}$，$g=(9.81,0)^{\mathsf T}$。这与原稿点质量算例一致。不能把这个矩阵与均匀杆的质心参数混搭。
+
+\section*{本章与原稿的对应}
+本章整合并展开 [A，第30--34页] 与 [B，第32--40页] 的刚体动力学内容。重新统一质量分布、外力方向和坐标约定，补足两关节欧拉拉格朗日的中间求导步骤，并修正把速度耦合项简单解释为“不做功”的表述。接触与柔性模型在下一章继续。

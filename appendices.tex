@@ -1,0 +1,424 @@
+\chapter{原稿内容对应与关键修订}\label{app:sources}
+
+本附录帮助读者在两份原稿和本书之间定位同一主题。A、B 的全名见前言，以下页码均为上传 PDF 的物理页序；对应关系按主题排列，不表示逐页逐句重写。本书把重复知识合并，把缺少的中间计算补齐，并用统一模型重新计算例子。\textbf{补充条件、改变教学模型和纠正错误是三种不同的处理}，不能因为新旧数字不同就认定原稿有误。
+
+\section{主题与阅读位置}
+
+\begingroup
+\small
+\setstretch{1.10}
+\renewcommand{\arraystretch}{1.20}
+\begin{longtable}{>{\raggedright\arraybackslash}p{30mm}>{\raggedright\arraybackslash}p{54mm}>{\raggedright\arraybackslash}p{70mm}}
+\toprule
+主题 & 原稿对应页码 & 本书处理与阅读位置\\
+\midrule
+\endfirsthead
+\toprule 主题 & 原稿对应页码 & 本书处理与阅读位置\\\midrule
+\endhead
+\midrule\multicolumn{3}{r}{接下页}\\\endfoot
+\bottomrule\endlastfoot
+线性代数与概率 & A：2--5；B：3、8--17 & 第1章。补充完整 SVD、条件数、QR、Cholesky、协方差传播和最小二乘数字。\\
+微积分、方程与变换 & A：3--5；B：17--24 & 第2章。加入初值、单位、变换条件、积分器稳定性和变分法边界项。\\
+三维位姿与李群 & A：22--26；B：3--8、24--27 & 第3章。固定坐标变换方向、四元数顺序、姿态误差符号与旋量参考点。\\
+运动学与雅可比 & A：26--30；B：14--17、26--32 & 第4--5章。串起解析逆解、局部迭代、奇异性、速度零空间与功率映射。\\
+动力学与执行器 & A：30--38；B：32--40、116--120 & 第6--7章。采用均匀杆模型，逐项求导，并补充传动、柔性、接触和电机约定。\\
+辨识、激励与摩擦 & A：33--34；B：41--53 & 第8--9章。明确可辨识组合、噪声假设、激励尺度、滤波和摩擦分离条件。\\
+负载、工具与相机标定 & A：22--30；B：44--50 & 第10章。展开静态负载回归、零偏、TCP 和手眼坐标链。\\
+反馈、状态空间与数字控制 & A：5--22、34--43；B：59--74、78--83 & 第11--13章。增加频域、LQR、精确离散化、饱和与逐拍更新的计算。\\
+观测、阻抗与操作空间 & A：16--18、29--30、39--52；B：54--58、74--87、122--123 & 第14--16章。区分扰动与接触力，推导质量重塑、任务惯量和力矩零空间。\\
+轨迹与示教 & A：52--60；B：87--97 & 第17--18章。补出边界系数、峰值、S 曲线分支、DMP 和 ProMP 算例。\\
+遥操作与视觉任务 & B：97--100 & 第19章。明确功率端口、位置和力缩放，并新增与相机坐标相连的视觉伺服算例。\\
+软件、接口与仿真 & A：67--74；B：100--120、125--127 & 第20--21章。区分模型、接口、控制时序与物理积分；软件内容结合已核对的一手文档。\\
+优化与学习方法 & A：60--67；B：65--68、92--93 & 第22章。用小规模 MPC、任务权重和接触约束解释适用边界。\\
+综合项目与七轴云台 & A：74--79；B：120--127 & 第23章。用可复算的 2R 教学实验连接全书，分开几何、跟踪、底座和低阻抗误差。\\
+\end{longtable}
+\endgroup
+
+\section{需要特别留意的修订}
+
+以下条目只指出会改变计算或判断的内容。原稿中的经验建议若没有充分的适用条件，本书将它改写为需要验证的设计选择，而不把它一律判作错误。
+
+\begin{enumerate}
+\item \textbf{特征值、奇异值和可对角化不是同一件事。}对于对称不定矩阵，奇异值是特征值的绝对值；一般矩阵也未必有完整特征向量基。第1章将这些结论分别说明，并给出数值例子。[A，第2--3页；B，第8--17页]
+
+\item \textbf{条件数要连同量纲和尺度一起报告。}本书保留奇异值判断局部病态的用途，同时说明米与毫米、位置与姿态的权重会改变数值。条件数较小不等于激励绝对强度足够，某个固定阈值也不是所有模型的通用合格线。[A，第3、33--34页；B，第14--17、41--53页]
+
+\item \textbf{几何角速度不是欧拉角导数。}第3、5章分开位置导数、角速度、欧拉角速率，以及空间旋量的平移部分。关于 $\log(R_d^{\mathsf T}R)$，关键是把误差的定义、正负号和表达坐标共同写出；不能只凭“左误差”或“右误差”的名称判断代码。[A，第22--30页；B，第24--32页]
+
+\item \textbf{速度耦合项不能笼统说成不做功。}标准刚体模型中，$\dot q^{\mathsf T}C\dot q=\tfrac12\dot q^{\mathsf T}\dot M\dot q$，来自 $\dot M-2C$ 的反对称性，而左侧不必为零。第6章给出 $0.00025\,\mathrm W$ 的直接计算。[A，第33页；B，第32--40页]
+
+\item \textbf{均匀杆和杆端点质量的数字不同，是模型不同。}本书主模型保留质心转动惯量；第6章另设练习恢复点质量模型的结果。不能拿一组模型的 $M$ 搭配另一组模型的质心和重力项。[A，第30--34页；B，第32--36页]
+
+\item \textbf{外力方向必须统一后再做减法。}本书规定环境对机器人的作用为 $\tau_{\rm ext}$，所以外力矩等于模型所需力矩减去执行器力矩。如果传感器报告的是机器人对环境的反作用，需先改变符号。第14章据此统一观测器与残差解释，完整公式见附录C。[A，第50--51页；B，第56--58、74--78页]
+
+\item \textbf{辨识权重、基参数数量和物理约束各有条件。}白化乘标准差的倒数，平方代价的权重为方差倒数；可辨识参数数目来自具体回归矩阵的秩。惯量矩阵正定还不足以保证刚体质量分布物理一致。第8--9章不把原稿中的某个参数数量、截止频率倍数或迭代轮数作为普遍规则。[A，第33--34页；B，第41--53页]
+
+\item \textbf{前馈、离散实现和滤波不能借用过强结论。}添加加速度前馈不会自动增加反馈系统型别；增量式 PID 仍需处理状态初始化和饱和；双向滤波的有效幅值响应与单向滤波不同。连续系统的稳定性也不能直接替代离散闭环分析。[A，第5--22页；B，第59--70、78--83页]
+
+\item \textbf{速度零空间和力矩零空间必须分别检查。}前者要求 $JN=0$，后者要检查 $JM^{-1}N^{\mathsf T}=0$，并使用相应的动态一致定义。阻尼伪逆一般破坏严格零空间性质；仅补偿任务方向的重力也未必托住全部冗余方向。[A，第29--30、44页；B，第55、83--86、122--123页]
+
+\item \textbf{小阻尼、平滑轨迹和仿真曲线都不自动完成其它目标。}零速度下黏性阻尼不提供静态托举力；平滑轨迹仍需单独满足限位与碰撞约束；教学仿真不能证明真机已经达到某项性能。第17--23章把结论分别限定到模型、输入、时序和验证范围。[A，第52--60、72--79页；B，第87--100、111--127页]
+\end{enumerate}
+
+\chapter{术语 符号与单位速查}\label{app:glossary}
+
+同一个字母在不同学科中可能重复使用。例如 $R$ 可表示旋转矩阵，也可能是优化权重；$C$ 可表示动力学矩阵，也可能是状态空间输出矩阵。\textbf{本表按定义查量，不按字母猜量。}表中转动单位保留 rad，虽然 SI 量纲分析通常把弧度视为无量纲。平移与转动组成的混合向量没有一个统一的物理单位。
+
+\begingroup
+\small
+\renewcommand{\arraystretch}{1.18}
+\begin{longtable}{>{\raggedright\arraybackslash}p{33mm}>{\raggedright\arraybackslash}p{39mm}>{\raggedright\arraybackslash}p{82mm}}
+\toprule 术语与常用英文 & 符号、单位或维度 & 使用时要知道的含义\\\midrule
+\endfirsthead
+\toprule 术语与常用英文 & 符号、单位或维度 & 使用时要知道的含义\\\midrule
+\endhead
+\midrule\multicolumn{3}{r}{接下页}\\\endfoot
+\bottomrule\endlastfoot
+\multicolumn{3}{l}{\textbf{数学与统计基础}}\\\midrule
+% TERM 01
+标量与列向量\newline scalar, vector & $a\in\mathbb R$；$x\in\mathbb R^n$ & 一个数与有序的一列数；向量的分量顺序必须固定。\\
+% TERM 02
+转置\newline transpose & $A^{\mathsf T}$；$n\times m$ & 对 $A\in\mathbb R^{m\times n}$ 交换行列；$(AB)^{\mathsf T}=B^{\mathsf T}A^{\mathsf T}$。\\
+% TERM 03
+秩\newline rank & $r=\operatorname{rank}A$ & 独立列或独立行的数量；不等于矩阵非零元素的数量。\\
+% TERM 04
+核与零空间\newline kernel, null space & $\ker A$；维数 $n-r$ & 满足 $Az=0$ 的全部输入方向；这里 $A$ 有 $n$ 列。\\
+% TERM 05
+特征值与特征向量\newline eigenpair & $Av=\lambda v$ & 沿 $v$ 作用后方向不变；实矩阵也可能有复特征值。\\
+% TERM 06
+奇异值分解\newline SVD & $A=U\Sigma V^{\mathsf T}$ & 奇异值 $\sigma_i\ge0$；显示输入方向经线性映射后的伸缩。\\
+% TERM 07
+条件数\newline condition number & $\kappa_2=\sigma_{\max}/\sigma_{\min}$ & 此比值用于满秩相应空间；需要同时说明单位与缩放，秩亏时通常记为无穷。\\
+% TERM 08
+摩尔彭若斯伪逆\newline pseudoinverse & $A^+$；$n\times m$ & 给出最小二乘的最小欧氏范数解；不能自行处理关节限位。\\
+% TERM 09
+二范数\newline Euclidean norm & $\|x\|_2=\sqrt{x^{\mathsf T}x}$ & 是所选坐标中的长度；混合单位分量应先定义权重或特征尺度。\\
+% TERM 10
+梯度与海森矩阵\newline gradient, Hessian & $\nabla f$；$\nabla^2 f$ & 分别描述一阶变化与局部曲率；单位随自变量而变。\\
+% TERM 11
+最小二乘\newline least squares & $\min_\beta\|H\beta-y\|^2$ & 最小化残差平方和；小训练残差不自动说明参数正确。\\
+% TERM 12
+协方差\newline covariance & $\Sigma=E[\delta x\delta x^{\mathsf T}]$ & 第 $i,j$ 项单位是 $x_i$ 单位乘 $x_j$ 单位，非对角项记录相关性。\\
+\midrule\multicolumn{3}{l}{\textbf{坐标 位姿与空间量}}\\\midrule
+% TERM 13
+坐标系\newline frame & $\{A\},\{B\}$ & 由原点和有序坐标轴组成；点的位置还取决于原点。\\
+% TERM 14
+位置\newline position & $p\in\mathbb R^3$；m & 指定参考点相对某原点的位置分量；不能省掉所属坐标系。\\
+% TERM 15
+旋转矩阵\newline rotation matrix & $R_{AB}\in\mathbb R^{3\times3}$ & 把 B 系分量变为 A 系分量；$R^{\mathsf T}R=I$、$\det R=1$。\\
+% TERM 16
+齐次变换\newline rigid transform & $T_{AB}\in\mathbb R^{4\times4}$ & 同时包含旋转与平移；$T_{AC}=T_{AB}T_{BC}$。\\
+% TERM 17
+叉乘矩阵\newline skew matrix & $[a]_\times b=a\times b$ & 三阶反对称矩阵；把叉乘写成矩阵乘法，不能交换乘法顺序。\\
+% TERM 18
+旋转群与旋转代数 & $SO(3)$；$\mathfrak{so}(3)$ & 前者是旋转矩阵集合，后者是其单位元处的反对称切向量集合。\\
+% TERM 19
+刚体运动群与代数 & $SE(3)$；$\mathfrak{se}(3)$ & 组合平移和旋转；指数与对数连接局部增量和有限位姿。\\
+% TERM 20
+旋转向量\newline rotation vector & $\phi=\theta u$；rad & 方向是旋转轴，长度是转角；接近 $\pi$ 时需关注分支。\\
+% TERM 21
+单位四元数\newline quaternion & $\boldsymbol q=(w,v)$；四个分量 & 本书标量在前；$\boldsymbol q$ 与 $-\boldsymbol q$ 表示同一旋转，勿与关节 $q$ 混淆。\\
+% TERM 22
+角速度\newline angular velocity & $\omega\in\mathbb R^3$；rad/s & 表示瞬时旋转轴和速率；一般不等于三个欧拉角的导数。\\
+% TERM 23
+六维几何速度 & $V=[v;\omega]$ & 线速度在前，角速度在后；线速度对应哪个点必须说明。\\
+% TERM 24
+力旋量\newline wrench & $F=[f;m]$；N 与 N m & 力矩关于指定参考点；与速度同点同轴时 $F^{\mathsf T}V$ 才是配对功率。\\
+% TERM 25
+几何雅可比\newline geometric Jacobian & $J\in\mathbb R^{m\times n}$ & 满足任务速度 $v_x=J\dot q$；所选任务决定行数和各行单位。\\
+\midrule\multicolumn{3}{l}{\textbf{运动学与路径}}\\\midrule
+% TERM 26
+关节状态 & $q,\dot q,\ddot q$ & 本书转动关节分别用 rad、rad/s、rad/s$^2$；移动关节需换为长度单位。\\
+% TERM 27
+正解与逆解\newline FK, IK & $T=f(q)$；求 $q$ & 正解从关节到任务；逆解可能多解、无解或仅能局部迭代求得。\\
+% TERM 28
+DH 参数 & $a_i,\alpha_i,d_i,\theta_i$ & 相邻坐标系的一种建模规则；标准与改进 DH 不能混搭。\\
+% TERM 29
+指数积\newline PoE & $\prod_i\exp([S_i]q_i)M_0$ & 由关节旋量和参考位姿构造正解；必须注明旋量及乘法约定。\\
+% TERM 30
+运动学奇异 & $\operatorname{rank}J$ 降低 & 机构在该位形失去某个独立瞬时任务方向；数值正则化不能创造运动自由度。\\
+% TERM 31
+工作空间\newline workspace & 可达位置或位姿集合 & 需区分位置可达、姿态可达和受限位碰撞约束后的可达。\\
+% TERM 32
+工具中心点\newline TCP & $p_{\rm TCP}$；m & 工具的任务参考点；它通常不同于负载质心。\\
+% TERM 33
+阻尼最小二乘\newline DLS & $J^{\mathsf T}(JJ^{\mathsf T}+\lambda^2I)^{-1}$ & 用有限误差换取较小关节速度；$\lambda$ 需与所用尺度配套。\\
+\midrule\multicolumn{3}{l}{\textbf{动力学与执行器}}\\\midrule
+% TERM 34
+质量与质心\newline mass, center of mass & $m$：kg；$c$：m & 质心坐标必须指定表达系和参考原点；不是随意选定的几何中心。\\
+% TERM 35
+质心转动惯量 & $I_C$；kg m$^2$ & 三维为对称 $3\times3$ 矩阵；本书 2R 只用绕平面法向的分量。\\
+% TERM 36
+关节惯量矩阵 & $M(q)\in\mathbb R^{n\times n}$ & 全转动关节常用 kg m$^2$；$\tfrac12\dot q^{\mathsf T}M\dot q$ 是动能。\\
+% TERM 37
+科氏与离心项 & $c(q,\dot q)=C\dot q$；N m & 由速度耦合产生；$c$ 固定时，满足该乘积的 $C$ 表达不唯一。\\
+% TERM 38
+重力项与重力加速度 & $g(q)$：N m；$g_0$：m/s$^2$ & $g(q)=\partial V/\partial q$；本书表示用于抵消重力的左端项。\\
+% TERM 39
+执行器与外力矩 & $\tau_{\rm cmd},\tau_{\rm ext}$；N m & 均按关节侧定义；后者是环境施加给机器人，而非其反作用。\\
+% TERM 40
+摩擦项 & $\tau_f$；N m & 本书放在动力学左侧；耗散摩擦满足 $\dot q^{\mathsf T}\tau_f\ge0$。\\
+% TERM 41
+机械能与功率 & $E$：J；$P$：W & 能量是状态储存量，功率是其变化率；$1\,\mathrm W=1\,\mathrm{J/s}$。\\
+% TERM 42
+电机力矩常数 & $K_t$；N m/A & 电流的峰值、有效值或 $dq$ 定义必须与力矩常数一致。\\
+% TERM 43
+传动比与效率 & $N$、$\eta$；无量纲 & 先注明 $N$ 是哪两个角速度的比；电机转动惯量折算涉及 $N^2$。\\
+% TERM 44
+刚度\newline stiffness & $K$；N/m 或 N m/rad & 把位移误差映射为恢复力或恢复力矩；混合任务矩阵有不同单位块。\\
+% TERM 45
+阻尼\newline damping & $D$；N s/m 或 N m s/rad & 把相对速度映射为耗散作用；零速度时黏性阻尼力为零。\\
+% TERM 46
+正动力学与逆动力学 & 求 $\ddot q$；求 $\tau$ & 前者由力矩预测加速度，后者由指定运动计算所需力矩。\\
+\midrule\multicolumn{3}{l}{\textbf{辨识 标定与数据}}\\\midrule
+% TERM 47
+待辨识参数 & $\beta\in\mathbb R^p$ & 可由惯性、重力或摩擦参数组合而成；每个分量的单位可能不同。\\
+% TERM 48
+回归矩阵\newline regressor & $H\in\mathbb R^{N_y\times p}$ & 满足 $y\approx H\beta$；列的单位需与对应参数配对后得到测量单位。\\
+% TERM 49
+残差\newline residual & $r=y-H\hat\beta$ & 用来检查模型与数据的差；不能仅靠其大小唯一定位误差来源。\\
+% TERM 50
+白化与加权 & $W\Sigma W^{\mathsf T}=I$ & 采用白化矩阵 $W$ 时，代价为 $\|Wr\|^2$，其二次权重是 $W^{\mathsf T}W$。\\
+% TERM 51
+参数协方差 & $P_\beta$；$p\times p$ & 单位为参数单位的两两乘积；解释依赖噪声模型和辨识假设。\\
+% TERM 52
+持续激励\newline persistent excitation & 回归信息随时间积累 & 要使目标参数方向获得独立信息；运动幅度大不等于全部方向都可辨识。\\
+% TERM 53
+基参数\newline base parameters & 由秩决定的参数组合 & 是数据可区分的最小组合；数量依赖结构、约束和观测，不能只看关节数。\\
+% TERM 54
+均方根与均方根误差 & RMS、RMSE；与被评估量同单位 & 要写清评价时间、各关节或各任务分量，以及是否经过归一化。\\
+% TERM 55
+递推最小二乘 & RLS；遗忘因子 $\lambda_f$ & 用新数据更新参数和信息；遗忘加快适应，也减少旧数据权重。\\
+\midrule\multicolumn{3}{l}{\textbf{控制与估计}}\\\midrule
+% TERM 56
+跟踪误差 & $e=q-q_d$；rad & 本书默认实际减期望；恢复反馈因此写为 $-K_pe-K_d\dot e$。\\
+% TERM 57
+PD 与 PID & 比例、微分、积分反馈 & 增益单位由被控对象和输出决定；积分状态需考虑限幅和模式切换。\\
+% TERM 58
+自然频率与阻尼比 & $\omega_n$：rad/s；$\zeta$：无量纲 & 用于标准二阶线性模型；不能把多关节系统逐轴任意视为独立二阶。\\
+% TERM 59
+状态、输入与输出 & $x,u,y$；维数由模型定义 & 状态含预测未来所需的信息；输出未必包含全部状态。\\
+% TERM 60
+状态空间矩阵 & $A,B,C_s,D_s$ & $\dot x=Ax+Bu$，$y=C_sx+D_su$；这里 $C_s$ 与动力学 $C$ 无关。\\
+% TERM 61
+极点\newline pole & 连续 $s$；离散 $z$ & 连续稳定要求极点实部为负；离散稳定要求位于单位圆内部。\\
+% TERM 62
+可控与可观 & controllable, observable & 是否能由输入影响全部状态、由输出重建全部状态；需结合具体模型判断。\\
+% TERM 63
+线性二次调节器 & LQR；$Q,R_u,P$ & 权重带有状态与输入尺度；最优性只针对指定模型和代价。\\
+% TERM 64
+卡尔曼滤波 & $K_f,Q_w,R_v$ & 增益由预测与测量不确定性决定；协方差单位应跟随对应状态和测量。\\
+% TERM 65
+扰动与扩张状态观测 & DOB、ESO & 通常估计模型未解释的总扰动；该量不自动等于纯接触力。\\
+% TERM 66
+阻抗与导纳 & impedance, admittance & 分别描述运动到力、力到运动的目标关系；实现取决于底层接口和传感信息。\\
+% TERM 67
+操作空间惯量 & $\Lambda=(JM^{-1}J^{\mathsf T})^{-1}$ & 需 $M\succ0$ 且 $J$ 满行秩；平移块类似质量，转动块类似惯量。\\
+% TERM 68
+动态一致零空间 & $\bar J=M^{-1}J^{\mathsf T}\Lambda$；$N=I-\bar JJ$ & 速度用 $N$，力矩用 $N^{\mathsf T}$；严格解耦还依赖模型、秩和实际执行。\\
+\midrule\multicolumn{3}{l}{\textbf{规划 人机输入与工程时序}}\\\midrule
+% TERM 69
+控制周期与积分步长 & $T_s,h$；s & 一个是控制器更新间隔，一个是物理数值积分间隔；两者可以不同。\\
+% TERM 70
+采样率与奈奎斯特频率 & $f_s=1/T_s$；$f_s/2$，Hz & 带限无混叠条件涉及采样前信号；采样后滤波不能恢复已经混叠的信息。\\
+% TERM 71
+延迟与抖动 & delay, jitter；s & 延迟是信息或作用的滞后，抖动是时序波动；均值不能代替最坏情况。\\
+% TERM 72
+时间戳与数据年龄 & $t_k$；$t_{\rm now}-t_k$，s & 区分采样时刻、接收时刻和执行时刻；同步误差会污染速度和力矩配对。\\
+% TERM 73
+零阶保持 & ZOH & 两次更新之间保持输入不变；精确离散化公式依赖这个输入假设。\\
+% TERM 74
+加加速度\newline jerk & $q^{(3)}$；rad/s$^3$ & 是加速度的变化率；限制它可以控制加速度变化，不能替代所有动力学约束。\\
+% TERM 75
+五次轨迹与 S 曲线 & quintic, S-curve & 前者满足六个端点条件；后者需根据速度、加速度和 jerk 限制选择分支。\\
+% TERM 76
+运动基元 & DMP、ProMP & 前者用受迫动态系统表达运动，后者用权重分布表达轨迹及条件化。\\
+% TERM 77
+预测控制与全身控制 & MPC、WBC & 前者滚动优化未来，后者协调多任务与约束；权重和严格优先级不同。\\
+% TERM 78
+无源性\newline passivity & 功率 $F^{\mathsf T}V$；储能 J & 通过能量账约束系统净产生的能量；必须定义端口方向和储能函数。\\
+% TERM 79
+实时性\newline real time & 截止期、最坏耗时、抖动 & 关注是否按时完成，而不只是平均运算快；具体要求来自任务。\\
+% TERM 80
+模型描述文件 & URDF、MJCF & 分别按各自格式表达机器人或仿真模型；导入成功仍需核对轴向、惯量和执行器定义。\\
+\end{longtable}
+\endgroup
+
+\chapter{手算复核顺序与公式适用条件}\label{app:recheck}
+
+本附录供实现或复习时查用。正文负责推导来源，这里保留一套可反复回代的数字和检查顺序。后续代码复现说明另列；这里的计算不依赖某个机器人库，也不把某种仿真器的运行当作已经完成的证据。
+
+\section{先固定维度 坐标与符号}
+
+对于 $n$ 个转动关节和 $m$ 维选定任务，$q,\dot q,\tau$ 均为 $n\times1$，$M$ 为 $n\times n$，$J$ 为 $m\times n$。完整六维任务用 $V=[v;\omega]$、$F=[f;m]$；二维平移任务只用 $v\in\mathbb R^2$ 和 $f\in\mathbb R^2$。不要把二维、三维和六维数组仅通过补零混成同一个物理定义。
+
+坐标变换约定是 $p_A=R_{AB}p_B+p_{AB}$，其中 $p_{AB}$ 是 B 系原点在 A 系中的位置。把雅可比的速度参考点从法兰改到 TCP 时，线速度块随力臂改变；力旋量中的力矩也要关于相同 TCP。关节顺序、角正方向和传动侧在整个计算链中保持一致。
+
+全书默认动力学与误差为
+\begin{align}
+M\ddot q+c+g+\tau_f&=\tau_{\rm cmd}+\tau_{\rm ext},\\
+e&=q-q_d,\qquad c=C\dot q.
+\end{align}
+如果控制器接口接受的是电流或电机侧力矩，应在动力学计算之外显式加入转换；不能把这两种输入直接当作关节侧 $\tau_{\rm cmd}$。
+
+\section{统一两连杆模型的完整速查}
+
+\subsection{参数与运动学}
+
+模型是固定基座、竖直平面、两个转动关节和两根均匀细杆：
+\[
+l_1=l_2=0.5\,\mathrm m,\quad
+m_1=m_2=1\,\mathrm{kg},\quad
+c_1=c_2=0.25\,\mathrm m,\quad
+I_1=I_2=\frac1{48}\,\mathrm{kg\,m^2}.
+\]
+重力为 $-y$ 方向，$g_0=9.81\,\mathrm{m/s^2}$。$q_1$ 从 $+x$ 轴逆时针起算，$q_2$ 是第二杆相对于第一杆的角。以下 $q_{12}=q_1+q_2$、$\dot q_{12}=\dot q_1+\dot q_2$，末端是第二杆端点。
+\begin{align}
+p(q)&=\frac12\begin{bmatrix}\cos q_1+\cos q_{12}\\\sin q_1+\sin q_{12}\end{bmatrix},\\
+J(q)&=\frac12\begin{bmatrix}
+-\sin q_1-\sin q_{12}&-\sin q_{12}\\
+\cos q_1+\cos q_{12}&\cos q_{12}
+\end{bmatrix},\\
+\dot p&=J\dot q,\qquad
+\ddot p=J\ddot q+\dot J\dot q,\\
+\dot J\dot q&=-\frac12\begin{bmatrix}
+\cos q_1\dot q_1^2+\cos q_{12}\dot q_{12}^2\\
+\sin q_1\dot q_1^2+\sin q_{12}\dot q_{12}^2
+\end{bmatrix}.
+\end{align}
+这里 $\det J=\tfrac14\sin q_2$。完整二维位置任务的瞬时奇异位形为 $q_2=k\pi$；若任务只选一个方向，应重新检查选中行的秩。
+
+\subsection{动力学与能量}
+
+将统一参数代入第6章的推导，得到
+\begin{align}
+M(q)&=\begin{bmatrix}
+\frac5{12}+\frac14\cos q_2&\frac1{12}+\frac18\cos q_2\\
+\frac1{12}+\frac18\cos q_2&\frac1{12}
+\end{bmatrix},\\
+c(q,\dot q)&=\frac18\sin q_2
+\begin{bmatrix}-(2\dot q_1\dot q_2+\dot q_2^2)\\\dot q_1^2\end{bmatrix},\\
+g(q)&=9.81\begin{bmatrix}
+\frac34\cos q_1+\frac14\cos q_{12}\\
+\frac14\cos q_{12}
+\end{bmatrix},\\
+T&=\tfrac12\dot q^{\mathsf T}M\dot q,\qquad
+V=9.81\left(\tfrac34\sin q_1+\tfrac14\sin q_{12}\right).
+\end{align}
+$M$ 的单位为 kg m$^2$，$c,g$ 为 N m，$T,V$ 为 J。不要把这里的质心距离 $c_i$ 与速度耦合向量 $c(q,\dot q)$ 混用。
+
+若末端只受到二维环境力 $f_{\rm ext}$，且无其它外部接触，
+\begin{align}
+\tau_{\rm ext}&=J^{\mathsf T}f_{\rm ext},\\
+\tau_{\rm cmd}&=M\ddot q+c+g+\tau_f-J^{\mathsf T}f_{\rm ext},\\
+\ddot q&=\operatorname{solve}\!\left(M,\,
+\tau_{\rm cmd}+J^{\mathsf T}f_{\rm ext}-c-g-\tau_f\right).
+\end{align}
+最后一式表示解线性方程，不要求显式构造 $M^{-1}$。如果环境还施加末端纯力矩，要同时加入对应角速度雅可比的转置映射；若接触发生在连杆中部，要使用该接触点的雅可比。
+
+\section{一组从位置到力矩再回代的核对数字}
+
+取第6章已经使用的运动状态，再显式加入教学外力和摩擦：
+\begin{gather}
+q=(0,\pi/2)^{\mathsf T},\quad
+\dot q=(0.2,-0.1)^{\mathsf T},\quad
+\ddot q=(0.5,-0.2)^{\mathsf T},\\
+f_{\rm ext}=(2,-3)^{\mathsf T}\,\mathrm N,\qquad
+\tau_f=(0.04,-0.03)^{\mathsf T}\,\mathrm{N\,m}.
+\end{gather}
+这里的摩擦向量只是该运动状态下的指定值；两关节分别正向、反向运动，且 $\dot q^{\mathsf T}\tau_f=0.011\,\mathrm W\ge0$，符合左端耗散约定。
+
+\begin{enumerate}
+\item \textbf{先检查几何和速度。}逐项代入三角函数后应得到
+\[
+p=\begin{bmatrix}0.5\\0.5\end{bmatrix},\quad
+J=\begin{bmatrix}-0.5&-0.5\\0.5&0\end{bmatrix},\quad
+\dot p=\begin{bmatrix}-0.05\\0.10\end{bmatrix}\,\mathrm{m/s}.
+\]
+再算 $J\ddot q=(-0.15,0.25)^{\mathsf T}$ 和
+$\dot J\dot q=(-0.02,-0.005)^{\mathsf T}$，所以
+$\ddot p=(-0.17,0.245)^{\mathsf T}\,\mathrm{m/s^2}$。这里删去 $\dot J\dot q$ 会得到不同结果。
+
+\item \textbf{分别计算惯性、速度和重力。}
+\[
+M=\begin{bmatrix}5/12&1/12\\1/12&1/12\end{bmatrix},\quad
+M\ddot q=\begin{bmatrix}0.1916667\\0.025\end{bmatrix},\quad
+c=\begin{bmatrix}0.00375\\0.005\end{bmatrix},\quad
+g=\begin{bmatrix}7.3575\\0\end{bmatrix}.
+\]
+$M_{11}>0$ 且 $\det M=1/36>0$，可先确认该两阶惯量矩阵正定；此处的 $c$ 和 $g$ 都是力矩。
+
+\item \textbf{用功率检查雅可比转置。}
+\[
+\tau_{\rm ext}=J^{\mathsf T}f_{\rm ext}
+=\begin{bmatrix}-2.5\\-1\end{bmatrix}\,\mathrm{N\,m}.
+\]
+任务侧功率是 $2(-0.05)-3(0.1)=-0.4\,\mathrm W$；关节侧是
+$(-2.5)(0.2)+(-1)(-0.1)=-0.4\,\mathrm W$。这一步若不相等，先查坐标、作用点、分量顺序和力方向。
+
+\item \textbf{按统一符号合成命令。}无摩擦无外力所需力矩为
+$(7.5529167,0.03)^{\mathsf T}\,\mathrm{N\,m}$；加入摩擦，再减去环境力矩，得到
+\[
+\tau_{\rm cmd}
+=\begin{bmatrix}7.5529167\\0.03\end{bmatrix}
++\begin{bmatrix}0.04\\-0.03\end{bmatrix}
+-\begin{bmatrix}-2.5\\-1\end{bmatrix}
+=\begin{bmatrix}10.0929167\\1.00\end{bmatrix}\,\mathrm{N\,m}.
+\]
+环境端口在此吸收机械能，执行器还需承担相应作用；不能仅看到 $\tau_{\rm ext}$ 的负号就再次反向。
+
+\item \textbf{回代原方程，不只检查中间公式。}先求净加速力矩
+\[
+\tau_{\rm cmd}+\tau_{\rm ext}-c-g-\tau_f
+=\begin{bmatrix}0.1916667\\0.025\end{bmatrix}.
+\]
+用 $M$ 解线性方程，应回到
+$\ddot q=(0.5,-0.2)^{\mathsf T}\,\mathrm{rad/s^2}$；再通过 $J\ddot q+\dot J\dot q$ 回到前面的末端加速度。
+
+\item \textbf{最后核对总能量。}本状态满足
+\[
+\dot T=0.0360833\,\mathrm W,\qquad
+\dot V=\dot q^{\mathsf T}g=1.4715\,\mathrm W.
+\]
+两者相加为 $1.5075833\,\mathrm W$。另一条独立路径为
+\[
+\dot q^{\mathsf T}\tau_{\rm cmd}
++\dot q^{\mathsf T}\tau_{\rm ext}
+-\dot q^{\mathsf T}\tau_f
+=1.9185833-0.4-0.011
+=1.5075833\,\mathrm W.
+\]
+这项相等检查同时约束惯量、重力、速度项与摩擦的符号。
+\end{enumerate}
+
+\section{公式能用到哪一步}
+
+下表只列最容易在实现中遗漏的前提。正则化、限幅、时延和状态估计一旦加入，实际闭环已不再等同于原来的理想代数模型，需要用相应模型重新判断。
+
+\begingroup
+\small
+\begin{longtable}{>{\raggedright\arraybackslash}p{54mm}>{\raggedright\arraybackslash}p{100mm}}
+\toprule 公式或判断 & 适用条件与检查点\\\midrule
+\endfirsthead
+\toprule 公式或判断 & 适用条件与检查点\\\midrule
+\endhead
+\midrule\multicolumn{2}{r}{接下页}\\\endfoot
+\bottomrule\endlastfoot
+$\hat\beta=(H^{\mathsf T}H)^{-1}H^{\mathsf T}y$ & 该写法要求 $H$ 列满秩。数值实现优先解最小二乘问题；无偏与协方差结论还要求相应噪声假设。回归矩阵自身有噪声时，普通最小二乘可能有偏。\\
+$J^+=J^{\mathsf T}(JJ^{\mathsf T})^{-1}$ & 只适用于满行秩的右伪逆公式。关节与任务尺度改变时，最小范数的物理含义也改变。对一般秩使用 SVD 等合适方法。\\
+$\dot q=J^+v+N\dot q_0$ & 欧氏正交投影用 $N=I-J^+J$。这是瞬时速度关系；有限步积分会产生漂移，且它本身不满足限位、碰撞和执行器约束。\\
+阻尼伪逆产生有限输出 & 正则化参数为正时改善病态求解，但一般有 $J(I-J_\lambda^\#J)\ne0$；不能再声称次任务完全不影响主任务。\\
+$\Lambda=(JM^{-1}J^{\mathsf T})^{-1}$ & 要求 $M$ 正定、所选 $J$ 满行秩。任务接近奇异时有效惯量会变大；六维混合单位需先定尺度。\\
+$\tau_{\rm null}=N^{\mathsf T}\tau_0$ & 这里 $N=I-\bar JJ$、$\bar J=M^{-1}J^{\mathsf T}\Lambda$。严格瞬时解耦的代数条件为 $JM^{-1}N^{\mathsf T}=0$；模型误差与力矩限幅会改变实际结果。\\
+$D=2\sqrt{MK}$ & 对应常系数、单自由度、$M>0,K>0$ 的标准二阶临界阻尼条件。一般矩阵不能逐元素开平方就得到多轴临界阻尼。\\
+$\dot V\le0$ 推导稳定性 & 储能不增并不自动意味着误差或速度趋零。渐近结论还需正定性、有界性及不变集等条件；半正定阻尼允许存在未耗散方向。\\
+$A_d=e^{AT_s}$ 与 ZOH 输入积分 & 对固定线性模型、固定采样周期和区间内输入保持不变是精确关系。对非线性或时变模型局部冻结矩阵时，只是相应近似。\\
+$f_s>2f_{\max}$ & 是理想带限信号的无混叠采样条件，实际还涉及模拟抗混叠和带外噪声。它不是“闭环采样率只需两倍带宽”的设计准则。\\
+五次最小 jerk 轨迹 & 固定时长、给定位置速度加速度的端点条件下，最小化平方 jerk 积分可得到五次多项式；关节界限、障碍和力矩限制须另外检查。\\
+S 曲线时间公式 & 必须先判断是否达到加速度上限、速度上限及是否存在巡航段。不同分支的持续时间公式不能混用，负的分段时间表示分支选择不成立。\\
+残差换算为末端外力 & 需要已知接触点与力的结构、合适的雅可比秩，以及足够准确的动力学残差。摩擦、标定和未建模力会与真实接触作用混在一起。\\
+刚度静态偏差 $e=K^{-1}F_r$ & 需静态平衡、明确的残差方向和可逆任务刚度。它不能直接预测撞击峰值，也不能证明带延迟接触闭环稳定。\\
+\end{longtable}
+\endgroup
+
+若检查失败，先保留一组状态、输入、单位和预期数字，让正解、雅可比、力矩、功率与回代相互一致，再扩大到整条轨迹。

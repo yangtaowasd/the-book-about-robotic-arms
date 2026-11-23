@@ -1,0 +1,200 @@
+[
+  {
+    "name": "position",
+    "actual": [
+      0.5,
+      0.5
+    ],
+    "expected": [
+      0.5,
+      0.5
+    ],
+    "passed": true
+  },
+  {
+    "name": "jacobian",
+    "actual": [
+      [
+        -0.5,
+        -0.5
+      ],
+      [
+        0.5,
+        3.061616997868383e-17
+      ]
+    ],
+    "expected": [
+      [
+        -0.5,
+        -0.5
+      ],
+      [
+        0.5,
+        0.0
+      ]
+    ],
+    "passed": true
+  },
+  {
+    "name": "velocity",
+    "actual": [
+      -0.05,
+      0.1
+    ],
+    "expected": [
+      -0.05,
+      0.1
+    ],
+    "passed": true
+  },
+  {
+    "name": "Jdotv",
+    "actual": [
+      -0.020000000000000004,
+      -0.005000000000000001
+    ],
+    "expected": [
+      -0.02,
+      -0.005
+    ],
+    "passed": true
+  },
+  {
+    "name": "acceleration",
+    "actual": [
+      -0.16999999999999998,
+      0.245
+    ],
+    "expected": [
+      -0.17,
+      0.245
+    ],
+    "passed": true
+  },
+  {
+    "name": "mass determinant",
+    "actual": 0.02777777777777777,
+    "expected": 0.027777777777777776,
+    "passed": true
+  },
+  {
+    "name": "inertial torque",
+    "actual": [
+      0.19166666666666668,
+      0.025000000000000005
+    ],
+    "expected": [
+      0.19166666666666668,
+      0.025
+    ],
+    "passed": true
+  },
+  {
+    "name": "velocity torque",
+    "actual": [
+      0.0037500000000000007,
+      0.005000000000000001
+    ],
+    "expected": [
+      0.00375,
+      0.005
+    ],
+    "passed": true
+  },
+  {
+    "name": "gravity",
+    "actual": [
+      7.3575,
+      1.501723137454442e-16
+    ],
+    "expected": [
+      7.3575,
+      0.0
+    ],
+    "passed": true
+  },
+  {
+    "name": "external",
+    "actual": [
+      -2.5,
+      -1.0
+    ],
+    "expected": [
+      -2.5,
+      -1.0
+    ],
+    "passed": true
+  },
+  {
+    "name": "virtual power",
+    "actual": -0.4,
+    "expected": -0.4,
+    "passed": true
+  },
+  {
+    "name": "virtual power value",
+    "actual": -0.4,
+    "expected": -0.4,
+    "passed": true
+  },
+  {
+    "name": "command",
+    "actual": [
+      10.092916666666667,
+      1.0000000000000002
+    ],
+    "expected": [
+      10.092916666666667,
+      1.0
+    ],
+    "passed": true
+  },
+  {
+    "name": "forward acceleration",
+    "actual": [
+      0.5000000000000018,
+      -0.20000000000000104
+    ],
+    "expected": [
+      0.5,
+      -0.2
+    ],
+    "passed": true
+  },
+  {
+    "name": "kinetic energy derivative",
+    "actual": 0.036083333333333335,
+    "expected": 0.03608333333333333,
+    "passed": true
+  },
+  {
+    "name": "potential derivative",
+    "actual": 1.4715,
+    "expected": 1.4715,
+    "passed": true
+  },
+  {
+    "name": "friction power",
+    "actual": 0.011,
+    "expected": 0.011,
+    "passed": true
+  },
+  {
+    "name": "command power",
+    "actual": 1.9185833333333333,
+    "expected": 1.9185833333333333,
+    "passed": true
+  },
+  {
+    "name": "energy balance",
+    "actual": 1.5075833333333333,
+    "expected": 1.5075833333333335,
+    "passed": true
+  },
+  {
+    "name": "energy derivative",
+    "actual": 1.5075833333333333,
+    "expected": 1.5075833333333333,
+    "passed": true
+  }
+]

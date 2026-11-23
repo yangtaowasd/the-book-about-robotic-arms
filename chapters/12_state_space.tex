@@ -1,0 +1,298 @@
+\chapter{状态空间最优反馈与稳定性证明}
+\label{ch:state_space}
+
+传递函数回答“输入怎样影响输出”；状态空间进一步记录系统当前的内部处境。机械臂同时有多个关节位置和速度，如果还考虑柔性、电流、积分器或外部负载，状态会更多。本章仍从一个关节起步，把矩阵里的每一个数字算出来，再解释为什么最优控制、观测器和预测控制都建立在这套表示上。
+
+\section{状态是预测未来所需的记忆}
+
+对 $J_r\ddot q+b\dot q=u$，只知道当前位置无法预测下一刻的位置：关节可能正在向前，也可能正在向后。取状态
+\[
+x=\begin{bmatrix}q\\v\end{bmatrix},\qquad v=\dot q,
+\]
+便可写为
+\begin{equation}
+\dot x=Ax+Bu,\qquad y=Cx+Du,
+\end{equation}
+其中
+\begin{equation}
+A=\begin{bmatrix}0&1\\0&-b/J_r\end{bmatrix},\quad
+B=\begin{bmatrix}0\\1/J_r\end{bmatrix},\quad
+C=\begin{bmatrix}1&0\end{bmatrix},\quad D=0.
+\end{equation}
+状态方程第二行仍然是原来的牛顿方程，第一行只是 $\dot q=v$。矩阵并未增加新的物理假设，只是把两个一阶方程放在一起。
+
+状态的分量可以有不同单位，因此 $A$ 的各元素未必有相同单位。例如 $A_{12}$ 把速度变成位置导数，数值为 1；$A_{22}=-b/J_r$ 的单位是每秒。直接把角度和角速度相加没有意义，而经过带正确单位的矩阵加权后可以相加。
+
+\subsection{从状态空间回到传递函数}
+
+零初始状态时，$sX=AX+BU$，故 $(sI-A)X=BU$，于是
+\[
+G(s)=C(sI-A)^{-1}B+D.
+\]
+对教学关节，$A=\left[\begin{smallmatrix}0&1\\0&-2\end{smallmatrix}\right]$、$B=[0,10]^\top$。直接解方程：第一行 $sX_1=X_2$，第二行 $(s+2)X_2=10U$，所以
+\[
+\frac{Y}{U}=\frac{10}{s(s+2)}=\frac{1}{s(0.1s+0.2)}.
+\]
+这和上一章完全相同。一般状态模型的内部极点是 $A$ 的特征值；只有在没有不可控、不可观消去等隐藏模态时，才会全部出现在输入输出传递函数中。因此“传递函数看起来稳定”不自动保证内部所有状态稳定。
+
+\subsection{非线性模型怎样在工作点附近变成矩阵}
+
+真实关节可能满足 $J_r\ddot q+b\dot q+g(q)=u$。选平衡点 $q_0$，静止时的输入为 $u_0=g(q_0)$。定义小偏差 $\delta q=q-q_0$、$\delta u=u-u_0$，使用
+\[
+g(q_0+\delta q)\approx g(q_0)+g'(q_0)\delta q
+\]
+得到
+\[
+\begin{bmatrix}\delta\dot q\\\delta\dot v\end{bmatrix}
+=\begin{bmatrix}0&1\\-g'(q_0)/J_r&-b/J_r\end{bmatrix}
+\begin{bmatrix}\delta q\\\delta v\end{bmatrix}
++\begin{bmatrix}0\\1/J_r\end{bmatrix}\delta u.
+\]
+$g'(q_0)$ 取决于姿态。相同机械结构在不同平衡点可能具有不同的局部稳定性。线性化结论只覆盖展开点附近，不能把它无条件推广到整条大范围运动。
+
+\section{先问能否控制以及能否看见}
+
+\subsection{可控性}
+
+可控性指是否能通过输入在有限时间内改变任意状态方向。对 $n$ 维连续线性系统，可控性矩阵为
+\[
+\mathcal C=[B,AB,A^2B,\ldots,A^{n-1}B].
+\]
+若 $\operatorname{rank}\mathcal C=n$，所有状态方向都可控。秩不足意味着至少存在一个输入无法改变的组合。
+
+\begin{examplebox}[算例 12A 教学关节的可控性和可观性]
+\[
+AB=\begin{bmatrix}10\\-20\end{bmatrix},\qquad
+\mathcal C=\begin{bmatrix}0&10\\10&-20\end{bmatrix}.
+\]
+$\det\mathcal C=-100\ne0$，因此秩为 2，位置和速度都可控制。注意输入只直接出现在速度导数里；经过时间演化，改变速度也会改变位置。
+
+如果只测位置，$C=[1,0]$，可观性矩阵为
+\[
+\mathcal O=\begin{bmatrix}C\\CA\end{bmatrix}
+=\begin{bmatrix}1&0\\0&1\end{bmatrix},
+\]
+秩为 2，因此位置历史加上输入历史足以重建速度。如果只测速度，$C_v=[0,1]$，则
+\[
+\mathcal O_v=\begin{bmatrix}0&1\\0&-2\end{bmatrix},
+\]
+秩为 1。两个位置相差一个常数、速度相同的运动，会给出完全相同的速度测量，因此绝对位置不可观。
+\end{examplebox}
+
+可控和可观是模型结构的性质；噪声很大时，数学上可观的量仍可能难以精确估计。这称为“可观性很弱”的工程情形，不能只看秩是否为满秩。若某些不可控模态本来已经稳定，仍可能设计稳定反馈，条件称为可稳定性；观测器对应的较弱条件称为可检测性。
+
+\section{用极点配置设计反馈}
+
+对零目标取 $u=-Kx$，$K=[k_1,k_2]$，闭环为
+\[
+\dot x=(A-BK)x.
+\]
+特征多项式展开为
+\begin{align}
+sI-A+BK&=
+\begin{bmatrix}s&-1\\k_1/J_r&s+(b+k_2)/J_r\end{bmatrix},\\
+\det(sI-A+BK)&=s^2+\frac{b+k_2}{J_r}s+\frac{k_1}{J_r}.
+\end{align}
+对于这个二阶关节，状态反馈就是 PD；对耦合的高维系统，状态反馈矩阵可以让某个关节的状态影响另一个关节的输入，因此比逐轴独立 PD 更一般。
+
+\begin{examplebox}[算例 12B 把闭环极点放在两个指定位置]
+期望极点为 $-8$、$-12$，对应多项式
+\[
+(s+8)(s+12)=s^2+20s+96.
+\]
+系数对齐得到 $k_1=0.1\times96=9.6$，$k_2=0.1\times20-0.2=1.8$。对常值目标 $q_d$，可以直接写
+\[
+u=-9.6(q-q_d)-1.8v.
+\]
+例如 $q-q_d=0.02\,\mathrm{rad}$、$v=-0.03\,\mathrm{rad/s}$，比例项为 $-0.192$，阻尼项为 $+0.054$，合计 $u=-0.138\,\mathrm{N\,m}$。速度为负表示关节正在回程，阻尼项为正，正在减缓回程速度。
+\end{examplebox}
+
+\subsection{积分增广就是给状态多加一份记忆}
+
+令 $z=\int e\,dt$，状态取 $x_a=[e,v,z]^\top$，常值目标时
+\[
+\dot x_a=
+\begin{bmatrix}0&1&0\\0&-2&0\\1&0&0\end{bmatrix}x_a
++\begin{bmatrix}0\\10\\0\end{bmatrix}u.
+\]
+取 $u=-k_pe-k_dv-k_iz$，期望极点为 $-3,-5,-8$。将
+\[
+(s+3)(s+5)(s+8)=s^3+16s^2+79s+120
+\]
+与 $s^3+(b+k_d)s^2/J_r+k_ps/J_r+k_i/J_r$ 比较，得到
+\[
+k_d=1.4,\qquad k_p=7.9,\qquad k_i=12.
+\]
+这比“随便加一点积分”清楚得多。不过饱和时系统不再满足这条线性特征方程，积分状态仍须进行抗饱和处理。
+
+\section{LQR 为什么会得到一组反馈增益}
+
+LQR 是线性二次型调节器，即 Linear Quadratic Regulator。它针对线性模型，使用平方形式的代价，求把状态带回零点的反馈。这里把代价记为 $\mathcal J$，避免与雅可比矩阵 $J$ 混淆：
+\begin{equation}
+\mathcal J=\int_0^\infty (x^\top Qx+u^\top R_uu)\,dt,
+\qquad Q\succeq0,\quad R_u\succ0.
+\end{equation}
+$Q$ 决定哪些状态偏差代价较高；$R_u$ 决定控制输入代价较高。$\succeq0$ 表示半正定，即任意二次型非负；$\succ0$ 表示正定。这里的 $R_u$ 是控制代价矩阵，不是旋转矩阵，也不是卡尔曼滤波的测量噪声协方差。
+
+\subsection{从最优剩余代价推到 Riccati 方程}
+
+设从当前状态出发的最优剩余代价为 $V(x)=x^\top Px$，其中 $P=P^\top$。在极短时间内，要付出当前代价，并使未来剩余代价发生变化。连续最优性方程可写成
+\[
+0=\min_u\left[x^\top Qx+u^\top R_uu+
+\frac{\partial V}{\partial x}(Ax+Bu)\right].
+\]
+由 $\partial V/\partial x=2x^\top P$，对括号中的式子关于 $u$ 求导：
+\[
+2R_uu+2B^\top Px=0.
+\]
+于是
+\begin{equation}
+u^*=-R_u^{-1}B^\top Px=-Kx.
+\end{equation}
+再代回最优性方程并把 $x$ 的二次项合并：
+\[
+0=x^\top\left(A^\top P+PA-PBR_u^{-1}B^\top P+Q\right)x.
+\]
+要让它对所有 $x$ 成立，括号内矩阵必须为零，得到连续代数 Riccati 方程：
+\begin{equation}
+A^\top P+PA-PBR_u^{-1}B^\top P+Q=0.
+\label{eq:cf_care}
+\end{equation}
+这并不是“试出了一个经验公式”，而是由代价最小条件导出。存在稳定化解需要可稳定性和相应可检测性等条件；并非任意 $A,B,Q,R_u$ 都能得到所需解。
+
+\begin{examplebox}[算例 12C 用三个标量方程手算 LQR]
+对教学关节，取 $Q=\operatorname{diag}(100,1)$、$R_u=1$，并设
+\[
+P=\begin{bmatrix}p_{11}&p_{12}\\p_{12}&p_{22}\end{bmatrix}.
+\]
+将 $A,B$ 代入式\eqref{eq:cf_care}，三个独立元素分别给出
+\begin{align*}
+-100p_{12}^2+100&=0,\\
+p_{11}-2p_{12}-100p_{12}p_{22}&=0,\\
+2p_{12}-4p_{22}-100p_{22}^2+1&=0.
+\end{align*}
+取稳定化的正定解 $p_{12}=1$，第三式变为 $100p_{22}^2+4p_{22}-3=0$，正根是
+\[
+p_{22}=\frac{-4+\sqrt{1216}}{200}=0.154356.
+\]
+第二式给 $p_{11}=2+100p_{22}=17.4356$。因此
+\[
+P=\begin{bmatrix}17.4356&1\\1&0.154356\end{bmatrix},
+\qquad K=B^\top P=[10,1.54356].
+\]
+闭环极点是 $-8.7178\pm4.8990j$。若初始误差为 $0.1\,\mathrm{rad}$ 且速度为零，初始控制量为 $-1\,\mathrm{N\,m}$，最优剩余代价为 $0.1^2\times17.4356=0.174356$。
+\end{examplebox}
+
+\begin{figure}[htbp]
+\centering\includegraphics[width=.95\linewidth]{figures/cf_lqr.pdf}
+\caption{同一教学关节的 LQR 比较。只改变输入代价 $R_u$，初始误差均为 0.1 rad。越惩罚力矩，通常越愿意以较慢的误差衰减换取较小的瞬时输入。}
+\end{figure}
+
+\subsection{权重需要量纲与工程限制的解释}
+
+一个起点是先归一化：$\tilde q=e/e_{\rm scale}$、$\tilde v=v/v_{\rm scale}$、$\tilde u=u/u_{\rm scale}$，然后惩罚 $\tilde q^2+\tilde v^2+\tilde u^2$。这等价于
+\[
+Q=\operatorname{diag}(1/e_{\rm scale}^2,1/v_{\rm scale}^2),
+\qquad R_u=1/u_{\rm scale}^2.
+\]
+这些尺度不是自动满足的硬限制。即使把 $u_{\rm scale}=2\,\mathrm{N\,m}$，LQR 仍可能在误差大时要求 4 或 20。需要严格满足力矩上限时，应明确考虑饱和或带约束优化，而不能把权重当成保护边界。
+
+LQR 的“最优”还只针对指定模型、指定代价、指定时间范围。改了负载、加入延迟、改变噪声模型或实际输出限幅，原来的最优性和鲁棒性结论不再直接适用。用观测状态替代真实状态组成 LQG 后，也不能照搬理想全状态 LQR 的特定裕度结论。
+
+\section{用能量解释稳定而不只是看曲线}
+
+对定点 PD 关节，误差方程为 $J_r\ddot e+(b+K_d)\dot e+K_pe=0$。取
+\begin{equation}
+V=\frac12J_r\dot e^2+\frac12K_pe^2.
+\end{equation}
+第一项是动能，第二项是虚拟弹簧势能。沿实际运动求导：
+\begin{align}
+\dot V&=J_r\dot e\ddot e+K_pe\dot e\\
+&=\dot e[-(b+K_d)\dot e-K_pe]+K_pe\dot e\\
+&=-(b+K_d)\dot e^2\le0.
+\end{align}
+这说明能量不会增加。仅有 $\dot V\le0$ 还不能直接宣布所有状态趋于零；还需看能量不再下降时能停在哪里。此时 $\dot e=0$，要一直保持静止还必须满足 $K_pe=0$，所以唯一不变平衡是 $e=0$。这就是 LaSalle 不变集分析在这个例子中的具体含义。
+
+\begin{figure}[htbp]
+\centering\includegraphics[width=.95\linewidth]{figures/cf_energy.pdf}
+\caption{状态轨迹向原点收敛，同时能量下降。误差在某个瞬间增大，不一定代表系统不稳定；还要看速度和总能量。}
+\end{figure}
+
+正定的 $V$ 像一个最低点位于目标的碗；负的 $\dot V$ 像摩擦持续消耗能量。这种证明能揭示控制律为什么有效，而不是仅证明某一次仿真曲线没有发散。全局结论还需要状态域、函数增长性质和模型条件；对姿态空间或带关节限位的系统，不能省略这些条件。
+
+\section{鲁棒自适应和重复学习的最小例子}
+
+\subsection{滑模控制如何对付有界扰动}
+
+考虑 $J_r\ddot q=u+d$，$|d|\le\bar d$，定义 $e=q-q_d$、$s=\dot e+\lambda e$。如果 $s=0$，则 $\dot e=-\lambda e$，误差沿指数曲线衰减。选择
+\[
+u=J_r(\ddot q_d-\lambda\dot e)-k\operatorname{sgn}(s).
+\]
+代入可得 $J_r\dot s=d-k\operatorname{sgn}(s)$，于是
+\[
+s\dot s\le-\frac{k-\bar d}{J_r}|s|.
+\]
+当 $k>\bar d$ 时，$|s|$ 会下降；理想不连续模型可给出有限到达时间上界
+\[
+t_{\rm reach}\le\frac{J_r|s(0)|}{k-\bar d}.
+\]
+例如 $J_r=0.1$、$|s(0)|=0.6$、$k=0.5$、$\bar d=0.2$，上界为 $0.2\,\mathrm{s}$。真实执行器无法无限快切换，采样和柔性会导致抖振，因此常把 sign 换成 $\operatorname{sat}(s/\phi)$。这会引入边界层，不能继续声称误差精确为零。
+
+若 $d=0.2$ 为常数、$\phi=0.02$、$\lambda=4$，在边界层内稳态满足 $d-k s/\phi=0$，得到 $s=d\phi/k=0.008$，进一步 $e=s/\lambda=0.002\,\mathrm{rad}$。鲁棒性与残差精度之间的交换可以直接算出来。
+
+\subsection{自适应控制为什么还需要激励}
+
+设未知重力系数为 $\theta$：
+\[
+J_r\ddot q+b\dot q+\theta\cos q=u.
+\]
+定义 $v_r=\dot q_d-\lambda e$、$a_r=\ddot q_d-\lambda\dot e$、$s=\dot q-v_r$。采用
+\[
+u=J_ra_r+b\dot q+\hat\theta\cos q-K_s s,
+\qquad \dot{\hat\theta}=-\Gamma\cos q\,s.
+\]
+令 $\tilde\theta=\hat\theta-\theta$，则
+\[
+J_r\dot s=-K_s s+\tilde\theta\cos q.
+\]
+候选能量为 $V=\tfrac12J_rs^2+\tfrac1{2\Gamma}\tilde\theta^2$，其导数中的交叉项为
+\[
+s\tilde\theta\cos q+
+\frac{\tilde\theta}{\Gamma}\dot{\hat\theta}=0,
+\]
+最终剩下 $\dot V=-K_ss^2$。更新律的符号来自这个抵消过程，不能凭直觉任意写正号。
+
+例如 $\cos q=0.8$、$s=0.1$、$\Gamma=0.5$，此时 $\dot{\hat\theta}=-0.04$。模型预测的重力项应逐渐减小。跟踪误差趋近零仍不意味着参数必然是真值：若长期停在 $\cos q=0$ 的姿态，数据根本看不到 $\theta$。参数收敛需要足够的持续激励，实际还需投影、死区等措施防止噪声使参数漂移。
+
+\subsection{重复动作怎样利用上一次误差}
+
+迭代学习控制 ILC 的“迭代”是完整动作执行次数，不是控制采样次数。用最简单的静态关系 $y_j=Gu_j$、$e_j=y_j-r$，令
+\[
+u_{j+1}=u_j-Le_j.
+\]
+代入得到 $e_{j+1}=(1-GL)e_j$。只要 $|1-GL|<1$，误差会随动作次数缩小。取 $G=0.8$、$L=1$、$r=1$、$u_0=0$，有
+\[
+(u_1,y_1,e_1)=(1,0.8,-0.2),
+\]
+\[
+(u_2,y_2,e_2)=(1.2,0.96,-0.04),\qquad
+(u_3,y_3,e_3)=(1.24,0.992,-0.008).
+\]
+真正的动态对象要处理相位、对齐、滤波和边界状态。重复扰动可以学到，随机接触或任务变化不能机械照搬上一次修正。
+
+\section{计算练习与逐步解答}
+
+\textbf{练习 1}\quad 教学关节希望极点为 $-4,-6$，求状态反馈 $K$。
+
+\textbf{解}\quad 期望多项式为 $s^2+10s+24$。故 $k_1=0.1\times24=2.4$，$k_2=0.1\times10-0.2=0.8$，即 $K=[2.4,0.8]$。常值参考的控制律为 $u=-2.4(q-q_d)-0.8v$。
+
+\textbf{练习 2}\quad 取 $e=0.03\,\mathrm{rad}$、$\dot e=-0.2\,\mathrm{rad/s}$，沿用 $J_r=0.1$、$K_p=10$、$b+K_d=1.4$。计算 $V$ 和 $\dot V$。
+
+\textbf{解}\quad 动能为 $0.5\times0.1\times0.2^2=0.002\,\mathrm{J}$；虚拟势能为 $0.5\times10\times0.03^2=0.0045\,\mathrm{J}$，故 $V=0.0065\,\mathrm{J}$。$\dot V=-1.4\times0.2^2=-0.056\,\mathrm{W}$，能量正在减少。
+
+\textbf{练习 3}\quad ILC 的静态增益 $G=0.5$，学习率 $L$ 的收敛范围是什么？若 $L=3$，初始误差为 0.08，三次更新后误差是多少？
+
+\textbf{解}\quad $|1-0.5L|<1$ 等价于 $0<L<4$。取 $L=3$，误差因子为 $-0.5$，因此三次后 $e_3=(-0.5)^3\times0.08=-0.01$。误差符号每次交替，但幅值在缩小；符号交替本身不等于发散。
+
+\section*{本章与原稿的对应}
+本章整合 [A，第15--18、39--43页] 与 [B，第63--67、71--74页]。补足了 Riccati 方程的来源、标量展开、积分增广和稳定性证明，并区分局部线性稳定、理想非线性稳定、参数收敛与实际饱和后的行为。
